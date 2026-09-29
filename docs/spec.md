@@ -41,7 +41,8 @@ These decide every case this spec doesn't cover.
 - Up to **9 windows**, labelled **A S D F G H J K L** (the home row, left to right).
   - **A** is the app's frontmost window, the one plain ⌘⇥ would have given you, and its row is
     highlighted.
-  - After it come the other windows in front-to-back order, then minimized windows.
+  - After it come the app's other windows, most recently used first, then minimized windows.
+    Windows on other Spaces and full-screen windows are listed like any other.
   - With more than 9 windows, the list ends with a line such as "+3 more", which can't be picked.
 - Letters restart at A for every app: Chrome with 3 windows gets A S D, Terminal with 2 gets A S.
 - Each row shows its letter badge, its title on one line (cut off at the end if too long), and a
@@ -76,9 +77,12 @@ nothing is picked, and the click lands on whatever is under the pointer.
 
 ### Edge cases
 
-- **Which windows count:** standard windows on the current Space, including minimized windows and
-  the windows of hidden apps. Dialogs, palettes and sheets don't count. Windows on other Spaces
-  and full-screen windows aren't listed; that's a known limitation.
+- **Which windows count:** standard windows on every Space, including full-screen windows,
+  minimized windows and the windows of hidden apps. Dialogs, palettes, sheets and background tabs
+  don't count; an app's tabs are one window, as ⌘\` treats them. (Changed 2026-09-29: the first live
+  run showed that listing only the current Space finds nothing for someone who keeps windows
+  full-screen.)
+- **A window on another Space:** picking it switches to that Space, with macOS's usual slide.
 - **The app quits or loses windows while the list is open:** the list refreshes. If one window or
   none is left, BetterTab switches to the app natively (or cancels if the app is gone).
 - **A quick ⌘⇥ tap** stays native when ⌘ is released before BetterTab has read the highlighted
@@ -140,7 +144,7 @@ are never logged. Release builds log counts and states only.
 |---|---|
 | List visible after releasing ⌘ | within one frame; window lists are read while the app is highlighted, before you let go |
 | Dots drawn after the switcher appears | under 100 ms. All apps are read in parallel, and AX calls time out at 250 ms each, so a hung app just gets no dots |
-| The chosen window in front after a key press | under 100 ms |
+| The chosen window in front after a key press | under 100 ms on the current Space; another Space adds macOS's slide |
 | Idle CPU | 0% |
 | Memory | under 30 MB |
 
@@ -161,7 +165,6 @@ These are hard-coded, with no settings UI.
 
 These aren't "later"; they're **no**, unless daily use proves otherwise:
 - thumbnails or previews (they would need Screen Recording);
-- windows on other Spaces, and full-screen windows;
 - closing, minimizing or moving windows from the list;
 - Chrome tabs;
 - a separate shortcut, or a second mode;
@@ -203,3 +206,6 @@ on the current Space.
 18. **Permission.** Revoke Accessibility: the status says so and ⌘⇥ is native. Grant it: active
     again within 2 s.
 19. **Idle.** With the switcher closed for a minute, Activity Monitor shows 0% CPU.
+20. **Other Spaces.** With one Chrome window on Desktop 1 and two full-screen, Chrome shows 3 dots
+    and the list shows all three. Picking a full-screen one switches to its Space, and typing goes
+    into it.

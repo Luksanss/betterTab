@@ -157,9 +157,29 @@ Route A+ inherits all of this from the native switcher. Route B has to rebuild i
   while cycling.
 - **Later:** mouse hover and click on icons · dragging files onto an icon.
 
-**Other Spaces (both routes).** The public AX API only sees windows on the current Space. AltTab
-reaches other Spaces with a private `_AXUIElementCreateWithRemoteToken` brute-force trick. For now
-the MVP covers the current Space only.
+**Windows on every Space (both routes; decided 2026-09-29 after the first live run).** The public AX
+API only sees windows on the current Space, and the maintainer keeps windows full-screen, so
+BetterTab found nothing. Measured on this Mac and researched in AltTab, yabai, Hammerspoon and
+WindowLens:
+- **Which windows exist:** SkyLight, with no permission at all. `SLSCopyManagedDisplaySpaces`
+  lists the Spaces; `SLSCopyWindowsWithOptionsAndTags` (options 0x7) lists their windows; and the
+  `SLSWindowQueryWindows` iterator gives each window's pid, parent, level, tags and attributes.
+  yabai's filter (MIT, `src/space.c`) keeps exactly the real windows, dropping the toolbars,
+  title-bar strips and background tabs. It takes about 1 ms for every app, so the dots come from it.
+- **Titles:** only through AX. Without Screen Recording the window server returns empty titles.
+  Per app: `kAXWindows` plus `kAXMainWindow` and `kAXFocusedWindow`, which reach the last main window
+  on any Space. For windows still unresolved, a time-boxed `_AXUIElementCreateWithRemoteToken` scan
+  runs, matching elements by `_AXUIElementGetWindow`. The element cache lives in memory; titles are
+  never cached. A row without a title yet shows "Untitled", and is still focusable by its window id.
+- **Order:** A is the main window, then SkyLight's order, which is the current Space first and then
+  other Spaces by recent use, then minimized windows.
+- **Focus:** `_SLPSSetFrontProcessWithOptions` with the window id, the make-key record and the AX
+  raise. macOS then slides to the window's Space. Without Accessibility the first call alone
+  doesn't switch Space (measured); falling back to `NSRunningApplication.activate` lands on the app's
+  front window's Space.
+
+Scratch notes and probes from that day are in the session scratchpad, not in the repo; the
+findings above are what matters.
 
 ## Recovery
 
