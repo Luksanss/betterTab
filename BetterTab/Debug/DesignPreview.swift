@@ -3,8 +3,8 @@ import AppKit
 import Carbon.HIToolbox
 import UniformTypeIdentifiers
 
-/// The v5 design's scenarios, for checking the dots and the window list by eye before the real
-/// switcher is wired up. Debug builds only.
+/// The v5 design's scenarios, for checking the stack edges and the window list by eye. Debug
+/// builds only.
 enum PreviewScenario: Int, CaseIterable {
     case chrome3, terminal2, notes1, minimized, eleven, untitledAndDuplicates, longTitle
 
@@ -21,17 +21,17 @@ enum PreviewScenario: Int, CaseIterable {
     }
 }
 
-/// Shows the dots and the window list over a stand-in switcher.
+/// Shows the stack edges and the window list over a stand-in switcher.
 ///
-/// The real `DotsOverlay` and `WindowList` are laid over the stand-in's tile frames, the way the
-/// controller will lay them over the native switcher's AX frames. Keys work as in Picking: letters,
+/// The real `StackEdgesOverlay` and `WindowList` are laid over the stand-in's icon frames, the way
+/// the controller lays them over the native switcher's AX frames. Keys work as in Picking: letters,
 /// arrows and Return pick, Esc closes, and Tab moves on to the next app as ⌘⇥ followed by a release
 /// would.
 final class DesignPreview {
     static let shared = DesignPreview()
 
     private let switcher = StandInSwitcher()
-    private let dots = DotsOverlay()
+    private let stackEdges = StackEdgesOverlay()
     private let list = WindowList(acceptsMouse: true)
     private var apps: [PreviewApp] = []
     private var highlighted = 0
@@ -53,8 +53,8 @@ final class DesignPreview {
         NSApp.unhide(nil)
         NSApp.activate()
         switcher.show(apps: apps.map { ($0.name, $0.icon) }, highlighted: highlighted, on: screen)
-        dots.show(switcherFrame: switcher.frame,
-                  icons: zip(switcher.tileFrames, apps).map { (frame: $0, windowCount: $1.windows.count) })
+        stackEdges.show(switcherFrame: switcher.frame,
+                  icons: zip(switcher.iconFrames, apps).map { (frame: $0, windowCount: $1.windows.count) })
         openList()
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -82,7 +82,7 @@ final class DesignPreview {
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
         list.hide()
-        dots.hide()
+        stackEdges.hide()
         switcher.hide()
     }
 
@@ -116,7 +116,7 @@ final class DesignPreview {
         let app = apps[highlighted]
         guard app.windows.count >= 2, let screen = switcher.screen else { return }
         list.show(windows: app.windows, switcherFrame: switcher.frame,
-                  iconFrame: switcher.tileFrames[highlighted], screen: screen)
+                  iconFrame: switcher.iconFrames[highlighted], screen: screen)
     }
 
     private func picked(_ windowIndex: Int) {
@@ -212,13 +212,17 @@ private struct PreviewApp {
 
 // MARK: - Stand-in switcher
 
-/// Rough scaffolding in place of the native ⌘⇥ switcher: a capsule of app icons.
+/// Rough scaffolding in place of the native ⌘⇥ switcher: a row of app icons, with the geometry
+/// measured from the real one on macOS 27 (five apps: a 712 × 176 pt switcher, 128 pt icons).
 private final class StandInSwitcher {
-    private static let tileSize: CGFloat = 120
-    private static let tileGap: CGFloat = 4
-    private static let iconSize: CGFloat = 100
-    private static let padding = NSEdgeInsets(top: 22, left: 34, bottom: 40, right: 34)
-    private static let nameGap: CGFloat = 7
+    /// An icon's frame, as AX reports it. The icon image fills it.
+    private static let iconSize: CGFloat = 128
+    private static let iconGap: CGFloat = 6
+    private static let padding: CGFloat = 24
+    private static let cornerRadius: CGFloat = 44
+    /// The highlight is the icon's frame inset by this much.
+    private static let highlightInset: CGFloat = 4
+    private static let nameGap: CGFloat = 1
 
     private let panel = KeyablePanel()
     private let background = NSVisualEffectView()
@@ -231,7 +235,7 @@ private final class StandInSwitcher {
     var screen: NSScreen? { panel.screen }
 
     /// In global coordinates, like the AX frames the controller will read from the real switcher.
-    var tileFrames: [CGRect] {
+    var iconFrames: [CGRect] {
         names.indices.map { tileRect($0).offsetBy(dx: panel.frame.minX, dy: panel.frame.minY) }
     }
 
@@ -255,20 +259,19 @@ private final class StandInSwitcher {
         iconViews = apps.enumerated().map { index, app in
             let view = NSImageView(image: app.icon)
             view.imageScaling = .scaleProportionallyUpOrDown
-            view.frame = tileRect(index).insetBy(dx: (Self.tileSize - Self.iconSize) / 2,
-                                                 dy: (Self.tileSize - Self.iconSize) / 2)
+            view.frame = tileRect(index)
             panel.contentView?.addSubview(view)
             return view
         }
 
         let count = CGFloat(apps.count)
-        let size = NSSize(width: Self.padding.left + Self.padding.right + count * Self.tileSize + max(count - 1, 0) * Self.tileGap,
-                          height: Self.padding.top + Self.tileSize + Self.padding.bottom)
+        let size = NSSize(width: 2 * Self.padding + count * Self.iconSize + max(count - 1, 0) * Self.iconGap,
+                          height: 2 * Self.padding + Self.iconSize)
         let origin = NSPoint(x: (screen.frame.midX - size.width / 2).rounded(),
                              y: (screen.frame.midY - size.height / 2).rounded())
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
         background.frame = NSRect(origin: .zero, size: size)
-        background.maskImage = WindowListView.roundedMask(radius: size.height / 2)
+        background.maskImage = WindowListView.roundedMask(radius: Self.cornerRadius)
 
         setHighlighted(highlighted)
         panel.makeKeyAndOrderFront(nil)
@@ -277,7 +280,7 @@ private final class StandInSwitcher {
     func setHighlighted(_ index: Int) {
         guard names.indices.contains(index) else { return }
         let tile = tileRect(index)
-        highlight.frame = tile
+        highlight.frame = tile.insetBy(dx: Self.highlightInset, dy: Self.highlightInset)
         nameLabel.stringValue = names[index]
         nameLabel.sizeToFit()
         nameLabel.setFrameOrigin(NSPoint(x: (tile.midX - nameLabel.frame.width / 2).rounded(),
@@ -289,8 +292,8 @@ private final class StandInSwitcher {
     }
 
     private func tileRect(_ index: Int) -> CGRect {
-        CGRect(x: Self.padding.left + CGFloat(index) * (Self.tileSize + Self.tileGap), y: Self.padding.bottom,
-               width: Self.tileSize, height: Self.tileSize)
+        CGRect(x: Self.padding + CGFloat(index) * (Self.iconSize + Self.iconGap), y: Self.padding,
+               width: Self.iconSize, height: Self.iconSize)
     }
 }
 

@@ -1,7 +1,7 @@
 import AppKit
 import os
 
-/// Ties the key tap to the switcher reader, the window index, the dots, the window list and the
+/// Ties the key tap to the switcher reader, the window index, the stack edges, the window list and the
 /// focuser (docs/spec.md § The flow, § States). Main actor only. The tap's own safety nets (the
 /// no-input timeout, the tap being turned off, stopping) don't depend on it.
 final class SwitchController {
@@ -20,7 +20,7 @@ final class SwitchController {
     private let watcher = SwitcherWatcher()
     private let index = WindowIndex()
     private let list = WindowList()
-    private let dots = DotsOverlay()
+    private let stackEdges = StackEdgesOverlay()
     private let logger = Logger(subsystem: "com.luksanss.BetterTab", category: "switch")
 
     private enum Phase: Equatable {
@@ -169,7 +169,7 @@ final class SwitchController {
         index.stopWatching()
         if let snapshot = watcher.current {
             loadCounts(snapshot)
-            showDots(snapshot)
+            showStackEdges(snapshot)
         }
         highlightLeaving = watcher.current?.selectedIndex
         tap.holdOnRelease = false
@@ -191,7 +191,7 @@ final class SwitchController {
         listed = nil
         epoch += 1
         list.hide()
-        dots.hide()
+        stackEdges.hide()
         watcher.end()
         index.cancel()
         windowsByPid = [:]
@@ -206,7 +206,7 @@ final class SwitchController {
     private func switcherChanged(_ snapshot: SwitcherSnapshot) {
         guard phase != .idle else { return }
         loadCounts(snapshot)
-        showDots(snapshot)
+        showStackEdges(snapshot)
         updateHoldOnRelease(snapshot)
         // During Picking the Dock's highlight moves when AX catches up with a fast Tab, when the
         // listed app's icon goes away, or when the pointer hovers over another icon. Only the
@@ -256,7 +256,7 @@ final class SwitchController {
         }
         windowsByPid[pid] = windows
         guard let snapshot = watcher.current else { return }
-        showDots(snapshot)
+        showStackEdges(snapshot)
         updateHoldOnRelease(snapshot)
     }
 
@@ -277,7 +277,7 @@ final class SwitchController {
         } else if !AppWindow.sameRows(merged, listed.windows) {
             list.update(windows: merged.map(Self.listItem))
             self.listed = (listed.pid, merged)
-            if let snapshot = watcher.current { showDots(snapshot) }
+            if let snapshot = watcher.current { showStackEdges(snapshot) }
             logger.debug("""
                 list updated: \(merged.count, privacy: .public) windows, \
                 \(merged.count(where: { $0.title.isEmpty }), privacy: .public) untitled
@@ -299,14 +299,14 @@ final class SwitchController {
         return kept + fresh.filter { !keptIDs.contains($0.windowID) }
     }
 
-    private func showDots(_ snapshot: SwitcherSnapshot) {
+    private func showStackEdges(_ snapshot: SwitcherSnapshot) {
         let icons = snapshot.items.map { item in
             (frame: item.frame, windowCount: item.pid.flatMap { windowsByPid[$0]?.count } ?? 0)
         }
         if icons.contains(where: { $0.windowCount >= 2 }) {
-            dots.show(switcherFrame: snapshot.frame, icons: icons)
+            stackEdges.show(switcherFrame: snapshot.frame, icons: icons)
         } else {
-            dots.hide()
+            stackEdges.hide()
         }
     }
 

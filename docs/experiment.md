@@ -34,8 +34,8 @@ one exception is ⌘⇥ again, which goes back to cycling while ⌘ is physicall
 
 ```sh
 xcodebuild -project BetterTab.xcodeproj -scheme Experiment -configuration Debug \
-  -derivedDataPath build/DerivedData build
-open build/DerivedData/Build/Products/Debug/BetterTabExperiment.app
+  -derivedDataPath build/DerivedData.noindex build
+open build/DerivedData.noindex/Build/Products/Debug/BetterTabExperiment.app
 ```
 
 Quit the running copy before you rebuild, and **never run the harness while BetterTab is

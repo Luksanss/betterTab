@@ -68,10 +68,25 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(makeDebugItem())
         #endif
 
+        // Information, not an action, so it's drawn disabled.
+        let version = NSMenuItem(title: Self.versionTitle, action: nil, keyEquivalent: "")
+        version.isEnabled = false
+        menu.addItem(version)
+
         let quit = NSMenuItem(title: "Quit BetterTab", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         menu.addItem(quit)
         return menu
+    }
+
+    /// "Version 0.1.87". Releases set the last part from the commit count (docs/releasing.md).
+    private static var versionTitle: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        #if DEBUG
+        return "Version \(version) (Debug)"
+        #else
+        return "Version \(version)"
+        #endif
     }
 
     // The system owns the Launch at Login state and the user can change it in System Settings, so

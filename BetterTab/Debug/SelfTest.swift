@@ -53,7 +53,7 @@ final class SelfTest {
     var bundleByPid: [Int32: String] = [:]
     var dockIgnoresSyntheticKeys = false
     var sawNonIdlePhase = false
-    var sawDots = false
+    var sawStackEdges = false
     private var clickSeen = false
     /// Set while `clean` runs, so no stop can cut it off between a ⌘ down and its ⌘ up.
     private var cleaning = false
@@ -243,9 +243,9 @@ final class SelfTest {
         }
         var finding = stop?.finding
         if finding == nil, !dockIgnoresSyntheticKeys, !sawNonIdlePhase {
-            finding = sawDots
-                ? "SelfTestHooks.phase never left “idle” although dots were drawn: the controller isn't writing the hooks."
-                : "The controller never left Idle and drew no dots: BetterTab's key tap may not be running (Input Monitoring?), or the hooks aren't wired."
+            finding = sawStackEdges
+                ? "SelfTestHooks.phase never left “idle” although stack edges were drawn: the controller isn't writing the hooks."
+                : "The controller never left Idle and drew no stack edges: BetterTab's key tap may not be running (Input Monitoring?), or the hooks aren't wired."
         }
         recorder.update { $0.notes.append(contentsOf: notes) }
         recorder.finish(result: stop?.result, finding: finding)
@@ -394,10 +394,10 @@ final class SelfTest {
 
     var listVisible: Bool { list?.isVisible ?? false }
 
-    var dots: DotsOverlay.DebugState? {
-        let states = DotsOverlay.debugStates
+    var stackEdges: StackEdgesOverlay.DebugState? {
+        let states = StackEdgesOverlay.debugStates
         let state = states.first(where: \.isVisible) ?? states.first
-        if state?.isVisible == true { sawDots = true }
+        if state?.isVisible == true { sawStackEdges = true }
         return state
     }
 
@@ -437,12 +437,16 @@ final class SelfTest {
             return false
         }
         if frontPid == home.processIdentifier { return true }
+        // Coming back from another Space, the Dock shows no switcher until the slide is over. The
+        // slide starts after the app is frontmost, so decide from where home's windows are now.
+        let windows = windowsByPid[home.processIdentifier] ?? []
+        let slides = !windows.isEmpty && !windows.contains { isOnCurrentSpace($0.id) }
         guard try await bringToFront(home, run) else {
             run.fail("couldn't bring the home app (\(bundle(home.processIdentifier))) to the front; frontmost is \(bundle(frontPid))")
             return false
         }
         // Let the Dock's app order settle before the next ⌘⇥.
-        try await sleep(0.25, run)
+        try await sleep(slides ? 1.2 : 0.25, run)
         return true
     }
 

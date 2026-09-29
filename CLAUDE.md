@@ -2,8 +2,8 @@
 
 A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
 switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-The whole flow is built, including windows on other Spaces, and worked in its first live run; the
-self-test hasn't run yet. See `docs/handoff.md` for where testing stands.
+The whole flow is built, including windows on other Spaces, and the self-test passes. See
+`docs/handoff.md` for where testing stands.
 
 ## Start here
 
@@ -21,16 +21,18 @@ One developer, one user, so keep it simple.
   Commits and no AI attribution.
 - **`main` is the last working version.** It moves only when the maintainer says a version works.
   Then merge `dev` into `main` (`git switch main && git merge --no-ff dev`). Never do this on your
-  own judgement.
+  own judgement. A push to `main` publishes a GitHub Release (`docs/releasing.md`).
 - **Never commit on `main` directly.**
 - **Archive a handoff only at a release,** meaning a merge of `dev` into `main`: copy
   `docs/handoff.md` to `docs/archive/handoffs/<ISO date>.md`, adding a topical suffix if the date
-  is taken. Between releases, `/handoff-update` rewrites `docs/handoff.md` in place and writes no
-  archive.
+  is taken. If the maintainer merges through a GitHub pull request, the next `/handoff-update` on
+  `dev` writes that archive. Between releases, `/handoff-update` rewrites `docs/handoff.md` in
+  place and writes no archive.
 - **The required check is a clean build of both schemes,** Debug and Release, with no warnings in
-  our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand.
+  our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand. The
+  `.noindex` suffix keeps the dev builds out of Spotlight, so the launcher doesn't list them.
   ```
-  for s in BetterTab Experiment; do for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme $s -configuration $c -derivedDataPath build/DerivedData build | grep -E 'error|warning: |BUILD' ; done; done
+  for s in BetterTab Experiment; do for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme $s -configuration $c -derivedDataPath build/DerivedData.noindex build | grep -E 'error|warning: |BUILD' ; done; done
   ```
 - **The project is a plain Xcode project with synchronized folders.** Files added under
   `BetterTab/` or `Experiment/` join their target automatically, so `project.pbxproj` rarely
@@ -41,7 +43,7 @@ One developer, one user, so keep it simple.
   `-allowProvisioningUpdates` once.
 - **Debug builds have a self-test** that drives ⌘⇥ end to end with synthetic keys and writes a
   report without titles. Quit BetterTab first, then run
-  `open -g build/DerivedData/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
+  `open -g build/DerivedData.noindex/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
   (`--long` adds the 15 s timeout test). It presses keys and switches Spaces for about two minutes,
   so only run it when the maintainer isn't using the Mac, and never with the screen locked.
 
