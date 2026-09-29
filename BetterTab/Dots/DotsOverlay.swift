@@ -49,7 +49,8 @@ private final class DotsView: NSView {
         NSColor.labelColor.withAlphaComponent(isDark ? 0.72 : 0.6).setFill()
 
         let diameter = DotsOverlay.dotDiameter
-        for icon in icons where icon.windowCount >= 2 {
+        // An icon AX hasn't given a frame for yet arrives empty; its dots come with the next read.
+        for icon in icons where icon.windowCount >= 2 && !icon.frame.isEmpty {
             let count = min(icon.windowCount, DotsOverlay.maxDots)
             let width = CGFloat(count) * diameter + CGFloat(count - 1) * DotsOverlay.dotGap
             let centreY = icon.frame.minY + DotsOverlay.dotCentreAboveIconBottom
