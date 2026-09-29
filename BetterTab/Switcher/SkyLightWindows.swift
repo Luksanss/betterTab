@@ -110,14 +110,18 @@ nonisolated enum SkyLightWindows {
               let iterator = sls.queryResultCopyWindows(query)?.takeRetainedValue()
         else { return nil }
         var rows: [(windowID: CGWindowID, pid: pid_t, tags: UInt64)] = []
-        while sls.iteratorAdvance(iterator) {
-            let tags = sls.iteratorTags(iterator)
-            let pid = sls.iteratorPID(iterator)
-            guard pid > 0, isRealWindow(
-                parent: sls.iteratorParentID(iterator), level: sls.iteratorLevel(iterator),
-                tags: tags, attributes: sls.iteratorAttributes(iterator))
-            else { continue }
-            rows.append((sls.iteratorWindowID(iterator), pid, tags))
+        // The iterator may point into the query and the id list without retaining them (yabai
+        // releases both only after iterating), so neither may be freed before the loop ends.
+        withExtendedLifetime((all, query)) {
+            while sls.iteratorAdvance(iterator) {
+                let tags = sls.iteratorTags(iterator)
+                let pid = sls.iteratorPID(iterator)
+                guard pid > 0, isRealWindow(
+                    parent: sls.iteratorParentID(iterator), level: sls.iteratorLevel(iterator),
+                    tags: tags, attributes: sls.iteratorAttributes(iterator))
+                else { continue }
+                rows.append((sls.iteratorWindowID(iterator), pid, tags))
+            }
         }
 
         // The iterator's own Space list comes back empty, so ask Space by Space: current ones
