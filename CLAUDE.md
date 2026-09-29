@@ -2,7 +2,8 @@
 
 A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
 switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-Nothing is built yet.
+The menu-bar item and the v5 layers (window list, dots) are built. The switcher integration waits on
+experiment test 0.
 
 ## Start here
 
@@ -26,8 +27,16 @@ One developer, one user, so keep it simple.
   `docs/handoff.md` to `docs/archive/handoffs/<ISO date>.md`, adding a topical suffix if the date
   is taken. Between releases, `/handoff-update` rewrites `docs/handoff.md` in place and writes no
   archive.
-- **No checks exist yet.** There's no build until the Xcode project lands. Its `xcodebuild`
-  command then becomes the required check, recorded here.
+- **The required check is a clean build of both schemes,** Debug and Release, with no warnings in
+  our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand.
+  ```
+  for s in BetterTab Experiment; do for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme $s -configuration $c -derivedDataPath build/DerivedData build | grep -E 'error|warning: |BUILD' ; done; done
+  ```
+- **The project is a plain Xcode project with synchronized folders.** Files added under
+  `BetterTab/` or `Experiment/` join their target automatically, so `project.pbxproj` rarely
+  needs editing. `Experiment` is the throwaway target for `docs/architecture.md` § The experiment.
+- **Builds are ad-hoc signed** because this Mac has no signing identity. macOS then drops the
+  Accessibility grant on every rebuild; re-grant it in System Settings → Privacy & Security.
 
 ## Rules that are expensive to forget
 
