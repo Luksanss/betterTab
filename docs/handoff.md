@@ -34,8 +34,8 @@ ticket tracker; the next action below is the backlog.
 ## Working copy state
 
 - **`main`** is `d7824ee`, the merge of pull request #2: release 2. `origin/main` matches.
-- **`dev`** has this session's commits on top of `26aaa3a`, and is pushed. A pull request from
-  `dev` to `main` is open and waiting for the maintainer. `dev` doesn't contain the merge commit
+- **`dev`** has this session's commits on top of `26aaa3a`, and is pushed. Pull request #3, from
+  `dev` to `main`, is open and waiting for the maintainer. `dev` doesn't contain the merge commit
   `d7824ee`, but its tree is the same as `dd3fa8e`, which `dev` has, so the pull request merges
   cleanly.
 - **GitHub:** `Luksanss/betterTab` is **public**. It went public with its history unchanged, so the
@@ -53,7 +53,7 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **The maintainer reviews and merges the open pull request** when this version works. That push
+1. **The maintainer reviews and merges pull request #3** when this version works. That push
    to `main` is the first automated release. Check the run under Actions → Release: it's the first
    time the workflow runs anywhere.
 2. **Add the two signing secrets** (`docs/releasing.md` § Signing with your certificate), ideally

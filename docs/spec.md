@@ -152,7 +152,7 @@ and states only.
 | What | Target |
 |---|---|
 | List visible after releasing ⌘ | within one frame; window lists are read while the app is highlighted, before you let go |
-| Stack edges drawn after the switcher appears | under 100 ms. All apps are read in parallel, and AX calls time out at 250 ms each, so a hung app just gets no edges |
+| Stack edges drawn after the switcher appears | under 100 ms. The window counts come from SkyLight, about 1 ms per app; AX adds only the titles, with a 250 ms timeout, so a hung app still gets its edges but untitled rows |
 | The chosen window in front after a key press | under 100 ms on the current Space; another Space adds macOS's slide |
 | Idle CPU | 0% |
 | Memory | under 30 MB |

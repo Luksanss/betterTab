@@ -28,7 +28,8 @@ stacked behind their icon. Single-window apps switch natively.
 | **Esc**, or **⌘** pressed and released | Cancels |
 | **⌘⇥** | Goes back to cycling |
 
-The menu-bar item has Launch at Login and Quit. There are no settings.
+The menu-bar item shows whether BetterTab is active and which version it is, and has Launch at
+Login and Quit. There are no settings.
 
 ## Build
 

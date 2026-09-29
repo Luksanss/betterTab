@@ -75,7 +75,7 @@ release instead (2026-09-29, `docs/product.md`). The research still applies to r
 | Component | Job |
 |---|---|
 | `SwitcherWatcher` | On ⌘⇥, find the Dock's `AXProcessSwitcherList`. Follow its selected child and read each child's frame. Report when the list is destroyed. |
-| `WindowIndex` | When the switcher opens, read every listed app's standard windows in parallel, using AX with a 250 ms timeout. That gives the window counts, and means the highlighted app's list is ready before ⌘ is released. |
+| `WindowIndex` | When the switcher opens, read every listed app's real windows: SkyLight gives the windows and counts in about 1 ms per app, then AX adds the titles in parallel, with a 250 ms timeout. So the highlighted app's list is ready before ⌘ is released, and a hung app keeps SkyLight's untitled windows. |
 | `StackEdgesOverlay` | A transparent, click-through panel above the native switcher. Behind each multi-window icon it draws the top edges of one or two more windows, from the icon's AX frame. |
 | `KeyTap` | A session-level `CGEvent` tap; details below. |
 | `WindowList` | The panel above the highlighted icon (design v4/v5). |

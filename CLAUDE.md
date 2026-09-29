@@ -21,7 +21,7 @@ One developer, one user, so keep it simple.
   Commits and no AI attribution.
 - **`main` is the last working version.** It moves only when the maintainer says a version works.
   Then merge `dev` into `main` (`git switch main && git merge --no-ff dev`). Never do this on your
-  own judgement. Every push to `main` publishes a GitHub Release (`docs/releasing.md`).
+  own judgement. A push to `main` publishes a GitHub Release (`docs/releasing.md`).
 - **Never commit on `main` directly.**
 - **Archive a handoff only at a release,** meaning a merge of `dev` into `main`: copy
   `docs/handoff.md` to `docs/archive/handoffs/<ISO date>.md`, adding a topical suffix if the date

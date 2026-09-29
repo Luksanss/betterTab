@@ -1,7 +1,8 @@
 # BetterTab: releasing
 
-Every push to `main` publishes a GitHub Release. The workflow is `.github/workflows/release.yml`,
-and it builds with `scripts/build-release.sh`. Written 2026-09-30.
+Every push to `main` publishes a GitHub Release. If several pushes queue up while one is building,
+only the newest of them runs. The workflow is `.github/workflows/release.yml`, and it builds with
+`scripts/build-release.sh`. Written 2026-09-30.
 
 ## How a release happens
 
