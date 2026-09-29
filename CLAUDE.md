@@ -29,9 +29,10 @@ One developer, one user, so keep it simple.
   `dev` writes that archive. Between releases, `/handoff-update` rewrites `docs/handoff.md` in
   place and writes no archive.
 - **The required check is a clean build of both schemes,** Debug and Release, with no warnings in
-  our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand.
+  our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand. The
+  `.noindex` suffix keeps the dev builds out of Spotlight, so the launcher doesn't list them.
   ```
-  for s in BetterTab Experiment; do for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme $s -configuration $c -derivedDataPath build/DerivedData build | grep -E 'error|warning: |BUILD' ; done; done
+  for s in BetterTab Experiment; do for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme $s -configuration $c -derivedDataPath build/DerivedData.noindex build | grep -E 'error|warning: |BUILD' ; done; done
   ```
 - **The project is a plain Xcode project with synchronized folders.** Files added under
   `BetterTab/` or `Experiment/` join their target automatically, so `project.pbxproj` rarely
@@ -42,7 +43,7 @@ One developer, one user, so keep it simple.
   `-allowProvisioningUpdates` once.
 - **Debug builds have a self-test** that drives ⌘⇥ end to end with synthetic keys and writes a
   report without titles. Quit BetterTab first, then run
-  `open -g build/DerivedData/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
+  `open -g build/DerivedData.noindex/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
   (`--long` adds the 15 s timeout test). It presses keys and switches Spaces for about two minutes,
   so only run it when the maintainer isn't using the Mac, and never with the screen locked.
 
