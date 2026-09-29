@@ -165,14 +165,17 @@ extension SelfTest {
             let shown = visible ? icon?.edgeCount ?? 0 : 0
             if shown != expected {
                 problems.append("\(bundle) shows \(shown) stack edges, expected \(expected)")
-            } else if shown > 0, let edges = icon?.edgesFrame {
-                // Centred on the icon, and inside the Dock's highlight: the frame inset by 4 pt.
-                let dx = edges.midX - frame.midX
-                let headroom = frame.maxY - edges.maxY
-                if abs(dx) > 2 || headroom < 4 || edges.minY < frame.midY {
+            } else if shown > 0, let front = icon?.frontEdge, let top = icon?.top {
+                // Centred on the icon, above its body, and inside the Dock's highlight: the frame
+                // inset by 4 pt at 128 pt, scaled for smaller icons. The body comes from the AX
+                // frame read here, not from the overlay.
+                let dx = front.midX - frame.midX
+                let rise = top - (frame.midY + frame.height * StackEdgesOverlay.bodyScale / 2)
+                let headroom = frame.maxY - top
+                if abs(dx) > 2 || rise <= 0 || headroom < frame.height * 4 / 128 {
                     problems.append("""
-                        \(bundle)'s stack edges are off their icon (dx \(Int(dx)), \(Int(headroom)) pt below the \
-                        icon frame's top)
+                        \(bundle)'s stack edges are off their icon (dx \(Int(dx)), \(Int(rise)) pt above the body, \
+                        \(Int(headroom)) pt below the icon frame's top)
                         """)
                 }
             }

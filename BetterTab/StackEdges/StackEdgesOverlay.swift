@@ -15,8 +15,9 @@ final class StackEdgesOverlay {
     static let narrowing: CGFloat = 0.12
     /// Corner radius as a share of the width, close to the icon body's own corners.
     static let cornerScale: CGFloat = 0.225
-    /// The clear line between an edge and whatever is in front of it.
-    static let gap: CGFloat = 1
+    /// The clear line between an edge and whatever is in front of it, as a share of the body's
+    /// side: 1 pt on a 103 pt body, thinner when the switcher shrinks its icons.
+    static let gap: CGFloat = 1.0 / 103
 
     private let panel = OverlayPanel()
     private let edgesView = StackEdgesView()
@@ -43,7 +44,7 @@ final class StackEdgesOverlay {
         panel.orderOut(nil)
     }
 
-    /// The icon's visible body, and the windows peeking out behind it, front to back. Empty for
+    /// The icon's visible body, and the windows peeking out behind it, front to back. No edges for
     /// fewer than two windows, or a frame AX hasn't given yet.
     static func stack(iconFrame: CGRect, windowCount: Int) -> (body: CGRect, edges: [CGRect]) {
         let side = min(iconFrame.width, iconFrame.height) * bodyScale
@@ -74,11 +75,11 @@ private final class StackEdgesView: NSView {
         // Front edge first; the one behind it is fainter. Dark mode was checked on the real
         // switcher; light mode mirrors it.
         let alphas: [CGFloat] = isDark ? [0.56, 0.34] : [0.36, 0.22]
-        let gap = StackEdgesOverlay.gap
 
         for icon in icons {
             let stack = StackEdgesOverlay.stack(iconFrame: icon.frame, windowCount: icon.windowCount)
             guard !stack.edges.isEmpty else { continue }
+            let gap = stack.body.width * StackEdgesOverlay.gap
             // A layer of its own, so each knockout clears only the edges behind it.
             context.cgContext.beginTransparencyLayer(auxiliaryInfo: nil)
             for depth in stack.edges.indices.reversed() {
@@ -110,9 +111,10 @@ extension StackEdgesOverlay {
         let windowCount: Int
         /// The edges drawn behind this icon.
         let edgeCount: Int
-        /// From the top of the icon's body to the top of the back edge, AppKit global; nil when no
-        /// edges are drawn.
-        let edgesFrame: CGRect?
+        /// The front edge's frame, AppKit global; nil when no edges are drawn.
+        let frontEdge: CGRect?
+        /// The top of the back edge, AppKit global; nil when no edges are drawn.
+        let top: CGFloat?
     }
 
     struct DebugState {
@@ -135,10 +137,10 @@ extension StackEdgesOverlay {
             let frame = icon.frame.offsetBy(dx: origin.x, dy: origin.y)
             let stack = Self.stack(iconFrame: frame, windowCount: icon.windowCount)
             guard let front = stack.edges.first, let back = stack.edges.last else {
-                return DebugIcon(frame: frame, windowCount: icon.windowCount, edgeCount: 0, edgesFrame: nil)
+                return DebugIcon(frame: frame, windowCount: icon.windowCount, edgeCount: 0, frontEdge: nil, top: nil)
             }
-            let edges = CGRect(x: front.minX, y: stack.body.maxY, width: front.width, height: back.maxY - stack.body.maxY)
-            return DebugIcon(frame: frame, windowCount: icon.windowCount, edgeCount: stack.edges.count, edgesFrame: edges)
+            return DebugIcon(frame: frame, windowCount: icon.windowCount, edgeCount: stack.edges.count,
+                             frontEdge: front, top: back.maxY)
         }
         return DebugState(isVisible: panel.isVisible, frame: panel.frame, icons: icons)
     }
