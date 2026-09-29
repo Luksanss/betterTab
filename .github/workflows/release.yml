@@ -38,8 +38,11 @@ jobs:
           else
             echo "::warning::$XCODE isn't on this runner, so the build uses the image's default Xcode."
           fi
-          xcodebuild -version
-          if ! xcodebuild -version | grep -q '^Xcode 27\.'; then
+          # Read it whole: `xcodebuild -version | grep -q` makes xcodebuild crash with a broken pipe
+          # once grep stops reading, and pipefail turns that into a failure.
+          version=$(xcodebuild -version)
+          echo "$version"
+          if [[ $version != "Xcode 27."* ]]; then
             echo "::error::BetterTab needs Xcode 27 (the macOS 27 SDK), and this runner doesn't have it."
             exit 1
           fi
