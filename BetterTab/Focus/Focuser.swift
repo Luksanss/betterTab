@@ -62,7 +62,7 @@ enum Focuser {
         let done = now()
 
         logger.notice("""
-            pid \(target.pid) window \(windowID): front in \(ms(target.start, done), format: .fixed(precision: 1)) ms \
+            pid \(target.pid, privacy: .private) window \(windowID, privacy: .private): front in \(ms(target.start, done), format: .fixed(precision: 1)) ms \
             (queue \(ms(target.start, started), format: .fixed(precision: 1)), \
             unhide+restore \(ms(started, prepared), format: .fixed(precision: 1)), \
             front \(ms(prepared, fronted), format: .fixed(precision: 1)), \
@@ -75,7 +75,7 @@ enum Focuser {
     private nonisolated static func unhideIfHidden(pid: pid_t) -> Bool {
         guard let app = NSRunningApplication(processIdentifier: pid), app.isHidden else { return false }
         guard app.unhide() else {
-            logger.error("pid \(pid): unhide was refused")
+            logger.error("pid \(pid, privacy: .private): unhide was refused")
             return true
         }
         // `unhide` only sends a request. Wait until the app says it's shown, because windows that
@@ -92,7 +92,7 @@ enum Focuser {
             }
             usleep(5_000)
         } while now() < deadline
-        logger.error("pid \(pid): still hidden after \(unhideWait / 1_000_000) ms; focusing anyway")
+        logger.error("pid \(pid, privacy: .private): still hidden after \(unhideWait / 1_000_000) ms; focusing anyway")
         return true
     }
 
@@ -114,7 +114,7 @@ enum Focuser {
         var psn = ProcessSerialNumber()
         let status = getProcessForPID(pid, &psn)
         guard status == 0 else {
-            logger.error("pid \(pid): GetProcessForPID error \(status)")
+            logger.error("pid \(pid, privacy: .private): GetProcessForPID error \(status)")
             return nil
         }
         return psn
@@ -128,7 +128,7 @@ enum Focuser {
         let raiseError = AXUIElementPerformAction(target.window, kAXRaiseAction as CFString)
         let activated = NSRunningApplication(processIdentifier: target.pid)?.activate(options: []) ?? false
         logger.error("""
-            pid \(target.pid): fell back to activate (\(reason, privacy: .public)) in \
+            pid \(target.pid, privacy: .private): fell back to activate (\(reason, privacy: .public)) in \
             \(ms(target.start, now()), format: .fixed(precision: 1)) ms; \
             activate \(activated ? "sent" : "refused", privacy: .public), raise error \(raiseError.rawValue)
             """)

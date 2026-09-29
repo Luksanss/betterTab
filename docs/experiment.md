@@ -38,7 +38,8 @@ xcodebuild -project BetterTab.xcodeproj -scheme Experiment -configuration Debug 
 open build/DerivedData/Build/Products/Debug/BetterTabExperiment.app
 ```
 
-Quit the running copy before you rebuild. Don't run it under the Xcode debugger: while it's
+Quit the running copy before you rebuild, and **never run the harness while BetterTab is
+running**: each would treat the other's synthetic ⌘ release as a real one. Don't run it under the Xcode debugger: while it's
 paused at a breakpoint, its tap holds up every key and click until macOS turns the tap off.
 
 **Permissions.** The build is signed ad hoc, so macOS forgets the grant on every rebuild, even
