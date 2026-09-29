@@ -64,13 +64,15 @@ These decide every case this spec doesn't cover.
 | **Return** | Opens the highlighted window. |
 | **Esc** | Cancels the whole switch: you stay in the app you started from. |
 | **⌘⇥** again | Closes the list and goes back to cycling, with the next app highlighted. Releasing ⌘ then follows the flow again. |
+| **⌘** pressed and released | Cancels, like Esc. It's also the way out if anything ever seems stuck. |
 | **Anything else** | Does nothing. The list keeps the keyboard until you pick or cancel. |
 
 Letters are matched by **physical key position**, not by the character typed, and each badge is
 labelled with what the user's keyboard layout prints on that key. On AZERTY the first key is
-therefore labelled Q. **Mouse:** hovering over a row highlights it, and clicking it opens that
-window. This works only if the experiment in `docs/architecture.md` shows that mouse events
-don't break the held-open native switcher. If they do, the list lets clicks pass through.
+therefore labelled Q. **Mouse:** the list doesn't take the mouse. Experiment test 0 showed that
+any click, even one on BetterTab's own panel, closes the held-open native switcher. So clicks pass
+through the list, and a click anywhere ends the switch: the switcher and the list close together,
+nothing is picked, and the click lands on whatever is under the pointer.
 
 ### Edge cases
 
@@ -79,9 +81,10 @@ don't break the held-open native switcher. If they do, the list lets clicks pass
   and full-screen windows aren't listed; that's a known limitation.
 - **The app quits or loses windows while the list is open:** the list refreshes. If one window or
   none is left, BetterTab switches to the app natively (or cancels if the app is gone).
-- **A quick ⌘⇥ tap** onto a multi-window app opens the list too, because the flow is the same
-  however fast you type. If the experiment shows this can't be done before the switcher has
-  drawn, a quick tap stays native.
+- **A quick ⌘⇥ tap** stays native when ⌘ is released before BetterTab has read the highlighted
+  app's windows. The switcher takes about 150–210 ms to appear to Accessibility, so only a tap
+  faster than roughly a quarter of a second is affected. Otherwise the flow is the same however
+  fast you type.
 - **You walk away:** after **15 s** with no key pressed, the switch is cancelled, as if you'd
   pressed Esc.
 - **Picking A** gives exactly what native ⌘⇥ would have. BetterTab doesn't focus anything

@@ -1,6 +1,7 @@
 # BetterTab: architecture
 
-This is a proposal; nothing is built yet. Research was done on 2026-09-29. Anything marked
+Route A+ is built, on the evidence of test 0 (§ Test 0 results); it hasn't been run end to end
+yet. Research was done on 2026-09-29. Anything marked
 **(verified)** was either read in the source of an app that ships the technique, or probed
 read-only on the dev machine (macOS 27.0, Xcode 27.0, Swift 6.4, arm64). The three apps are:
 
@@ -34,11 +35,10 @@ What's verified and what isn't:
   - A session-level event tap sees ⌘⇥ and can swallow other keys while the native switcher is
     open.
   - The switcher can be read through Accessibility: its highlighted app and each icon's frame.
-- **Unverified; this whole route depends on it:** swallowing the `flagsChanged` event for the ⌘
-  release keeps the native switcher open. It fails if the Dock reads the hardware modifier state
-  directly, or if it gets the release before any event tap sees it. It could also be fragile if
-  the Dock notices ⌘ is up from the flags on later events, such as mouse moves. Nobody is known to
-  ship this.
+- **Verified on this Mac by test 0 (2026-09-29; § Test 0 results), and the whole route depends
+  on it:** swallowing the `flagsChanged` event for the ⌘ release keeps the native switcher open,
+  with the session tap and with the HID tap. Mouse moves don't disturb it, but any click closes
+  it. Nobody else is known to ship this.
 
 Why it's worth trying: nothing native gets rebuilt, and native ⌘⇥ is never turned off.
 
@@ -113,7 +113,8 @@ flashes less:
 | Focus one window | `_SLPSSetFrontProcessWithOptions(psn, wid, userGenerated)`, then a make-key nudge, then `kAXRaiseAction`. For a minimized window, first set `kAXMinimizedAttribute` to false | private (links on macOS 27, verified by probe) | Accessibility |
 | Route B only: turn native ⌘⇥ off and on | `CGSSetSymbolicHotKeyEnabled(1 or 2, Bool)`; read the state with `CGSIsSymbolicHotKeyEnabled` | private. Links on macOS 27; both read as enabled on 2026-09-29 (verified, probe) | none |
 
-**Focusing (verified,** AltTab `src/switcher/state/Window.swift`, `applyFocus`**).** Since
+**Focusing (approach verified in** AltTab `src/switcher/state/Window.swift`, `applyFocus`**;
+built from yabai's MIT make-key technique instead, with its notice kept).** Since
 macOS 14, `NSRunningApplication.activate` is only a request, and it won't reliably move keyboard
 focus to another app. `kAXRaiseAction` and making a window key only change the stacking order.
 Passing the window id to `_SLPSSetFrontProcessWithOptions` brings just that window forward, not
@@ -217,9 +218,29 @@ to whichever route wins.
 
 If test 3 fails on both routes, the product doesn't work, so stop and rethink.
 
-## Project setup (proposed, not decided)
+### Test 0 results (2026-09-29, the maintainer's run)
 
-Use a plain Xcode project. Since Xcode 16, synchronized folders keep the `.pbxproj` stable when
-files are added, so there's no generator to install. Set `LSUIElement = YES`. The deployment target
-is the current macOS, since this is for personal use. Once a scheme exists, its `xcodebuild … build`
-command becomes the required check in `/handoff-update`.
+Run with the `Experiment` harness (`docs/experiment.md`); the evidence is its log.
+- **Pass:** the hold itself, with both tap locations; b (mouse moves); c (swallowed letters); d (the
+  synthetic ⌘ release finished a switch from Ghostty to Chrome); f (session and HID state both show
+  ⌘ up 200 ms after every release); h (⌘ pressed again, then Tab, moves the highlight on).
+- **Not yet shown:** a (the longest idle hold with the switcher up was about 6 s, not 15 s); e
+  (every Esc was on an app that was already in front, so cancelling and switching look the same);
+  g (`kill -9` recovery wasn't run); i (no deliberate quick tap).
+- **Clicks close the switcher.** The first click, even on the harness's own panel at layer 21,
+  closes it and never reaches the panel. So the window list is click-through, and the controller
+  ends a hold with only the ⌘ release when the switcher closes.
+- **The switcher's window** is Dock-owned, full-screen, at layer 20. The `AXProcessSwitcherList`
+  is a direct child of the Dock's app element, found 150–210 ms after ⌘⇥. Its items are 128×128 pt
+  tiles whose `AXTitle` is the app's name.
+- **Input Monitoring:** still open. Both permissions were granted at once, so the run can't say
+  whether Accessibility alone is enough.
+
+On this evidence route A+ was built. a, e and g are still to be confirmed; they're also covered by
+acceptance tests 7, 14 and 15.
+
+## Project setup (decided 2026-09-29)
+
+A plain Xcode project. Since Xcode 16, synchronized folders keep the `.pbxproj` stable when files
+are added, so there's no generator to install. `LSUIElement = YES`, and the deployment target is
+macOS 27, since this is for personal use. The required check is in `CLAUDE.md`.
