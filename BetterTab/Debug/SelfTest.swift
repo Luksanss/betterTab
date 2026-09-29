@@ -437,12 +437,16 @@ final class SelfTest {
             return false
         }
         if frontPid == home.processIdentifier { return true }
+        // Coming back from another Space, the Dock shows no switcher until the slide is over. The
+        // slide starts after the app is frontmost, so decide from where home's windows are now.
+        let windows = windowsByPid[home.processIdentifier] ?? []
+        let slides = !windows.isEmpty && !windows.contains { isOnCurrentSpace($0.id) }
         guard try await bringToFront(home, run) else {
             run.fail("couldn't bring the home app (\(bundle(home.processIdentifier))) to the front; frontmost is \(bundle(frontPid))")
             return false
         }
         // Let the Dock's app order settle before the next ⌘⇥.
-        try await sleep(0.25, run)
+        try await sleep(slides ? 1.2 : 0.25, run)
         return true
     }
 
