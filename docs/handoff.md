@@ -1,9 +1,9 @@
 # Handoff
 
-Written 2026-09-29, when the handoff system was set up. There is no earlier session to carry
-forward. This first version records the working copy as it stands, the idea validation done that
-day, and the conventions agreed at setup. Everything below is meant to be rewritten by
-`/handoff-update` as work lands. Treat the structure as a starting point, not a form to fill in.
+Rewritten by hand on the evening of 2026-09-29, at the end of the session that built the whole app
+while the maintainer was away; `/handoff-update` may rewrite it again. The first live run found
+nothing to show, which led to listing windows on every Space. That version is built and reviewed but
+has **not** had a live run yet.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -18,42 +18,49 @@ ticket tracker; the next action below is the backlog.
 
 ## Working copy state
 
-There are two branches and no remote (see `CLAUDE.md` § Branches, commits and handoffs):
-- **`dev`** is where all work is committed. As of 2026-09-29 it holds `Initial commit` plus four
-  docs commits:
-  - the product docs, spec, architecture and the v5 design brief;
-  - the repo-local handoff skills;
-  - `CLAUDE.md` with this handoff;
-  - a commit restoring those skills to their installed template form (the maintainer doesn't want
-    them edited).
-- **`main`** is the last working version. It's still `087e07e Initial commit`, because nothing
-  works yet. It moves when the maintainer says a version works.
-
-No code exists yet. Nothing project-related runs locally. The listeners on :5000 and :7000 are
-macOS AirPlay Receiver (ControlCenter); :37701 is the claude-mem worker; :44950 and :44960 are
-the Figma desktop agent. The dev machine: macOS
-27.0 on Apple Silicon, Xcode 27.0, Swift 6.4. Neither XcodeGen nor Tuist is installed.
+- **`dev`** holds everything: the Xcode project, the app, the test 0 harness, the self-test and the
+  docs. It has a remote, `origin` on GitHub, where `main` and `dev` were pushed before this session.
+  The session's commits (about 25, from `16bc688` on) are **not pushed**; agents never push.
+- **`main`** is still `087e07e Initial commit`: nothing has worked live yet.
+- **Build:** the check in `CLAUDE.md` (both schemes, Debug and Release) passes with no warnings in
+  our code. The Debug app is staged at `build/DerivedData/Build/Products/Debug/BetterTab.app`. It's
+  ad-hoc signed and **not yet granted Accessibility**; no BetterTab is running.
+- Dev machine: macOS 27.0.1 (26A434) on Apple Silicon, Xcode 27.0, Swift 6.4. There's no signing
+  identity. :5000/:7000 are AirPlay, :37701 the claude-mem worker, :44950/:44960 the Figma agent.
 
 ## Next action
 
-1. **The maintainer creates design v5 in Claude Design** from `docs/design-brief-v5.md`. The
-   project is "Mac Window Switcher Prototype"; v4 is `Window Switcher v4.dc.html`, reviewed
-   2026-09-29. Check v5 against `docs/spec.md`, which has 19 acceptance tests.
-2. **Run experiment test 0 before anything else** (`docs/architecture.md` § The experiment). It
-   decides the route: can a swallowed ⌘ release hold the native switcher open? Build it as a
-   throwaway menu-bar target. **If test 0 passes, use route A+; if it fails, use route B.** Record
-   the result under Decisions already settled, with what failed.
-3. Then run experiment tests 1–3: read the switcher, list windows, and focus one without a flash.
-4. Once a build exists, record its `xcodebuild` command as the required check in `CLAUDE.md`
-   § Branches, commits and handoffs. Don't edit the handoff skills in `.claude/skills/`: the
-   maintainer keeps them as installed, and repo specifics belong in `CLAUDE.md`.
-
-**Open decisions:**
-- **Route A+ or B.** Test 0 decides; nothing else does.
-- **How to set up the project.** A plain Xcode project with synchronized folders, or XcodeGen.
-  A plain Xcode project is recommended: there's nothing to install.
+1. **Make grants survive rebuilds.** Every rebuild is ad-hoc signed (designated requirement =
+   cdhash), so macOS drops the Accessibility grant each time, and agents can't grant it. The
+   maintainer signs in to Xcode (Settings → Accounts → + → Apple ID, then Manage Certificates → +
+   Apple Development). Then an agent sets `DEVELOPMENT_TEAM` and `CODE_SIGN_IDENTITY = Apple
+   Development` for both targets, reading the team id from the certificate's OU.
+2. **The maintainer grants the new build once** (System Settings → Privacy & Security →
+   Accessibility; remove the old BetterTab entry, add the new one) and launches it.
+3. **Run the self-test** while nobody is using the Mac (see `CLAUDE.md`). Iterate on its report.
+   Its first questions: does the Dock react to synthetic ⌘⇥? Do titles resolve for full-screen
+   windows? Does focusing a window on another Space slide to it?
+4. Then the maintainer tries it by hand: acceptance tests 1–20 in `docs/spec.md`, especially 4
+   (flash) and 20 (other Spaces).
+5. Still owed from test 0: 0a (hold ≥ 15 s), 0e (Esc cancels on a non-front app), 0g (`kill -9`
+   recovery). They are acceptance tests 15, 7 and 14.
 
 ## Decisions already settled
+
+- **Route A+: hold macOS's own switcher open** (test 0, 2026-09-29). The hold works with the session
+  tap; the evidence is in `docs/architecture.md` § Test 0 results. Native ⌘⇥ is never turned off.
+- **A plain Xcode project with synchronized folders** (maintainer, 2026-09-29), with a throwaway
+  `Experiment` target for test 0.
+- **Windows on every Space, full-screen ones included, are in scope** (agent's call, 2026-09-29,
+  after the first live run found nothing: the maintainer keeps Chrome and Claude full-screen).
+  Accessibility stays the only permission: SkyLight lists the windows with no permission, and AX
+  supplies titles. Background native tabs still don't count. **The maintainer should confirm this.**
+- **The list ignores the mouse, and a click ends the switch** (test 0: any click, even on our own
+  panel, closes the native switcher).
+- **⌘ pressed and released while the list is open cancels** (agent's call). It doubles as the
+  recovery gesture if anything seems stuck.
+- **Focusing follows yabai (MIT, notice kept), not AltTab.** Make-key posts a mouse down only, at a
+  point far past the window, so nothing can be clicked or resized (AltTab #5381/#5900, facts only).
 
 - **Pick the window after releasing ⌘** (maintainer, 2026-09-29).
   - Releasing on a multi-window app doesn't switch. The switcher stays, and a window list opens
@@ -82,6 +89,32 @@ the Figma desktop agent. The dev machine: macOS
 - **No ticket tracker.**
 
 ## Findings worth keeping
+
+**From this session (2026-09-29), all on this Mac:**
+- **Test 0:** the hold, mouse moves, swallowed letters, the synthetic release finishing a switch, ⌘
+  not stuck, and ⌘⇥ again all pass. See `docs/architecture.md` § Test 0 results.
+- **The native switcher,** as found through AX: the Dock-owned `AXProcessSwitcherList` is found about
+  220 ms after ⌘⇥; items are matched to pids by name (the Dock gives no `AXURL`). Its window is
+  full-screen at layer 20.
+- **Windows on other Spaces:** see `docs/architecture.md` § Windows on every Space. The expensive
+  facts:
+  - SkyLight enumeration plus yabai's filter returns exactly the real windows with **no
+    permission**;
+  - without Screen Recording the window server returns **empty titles**, so titles only come
+    through AX;
+  - `_SLPSSetFrontProcessWithOptions` alone, without Accessibility, makes the app frontmost but
+    **doesn't switch Space**.
+- **Permissions for testing:**
+  - an ad-hoc build's designated requirement is its cdhash, so any rebuild loses the grant;
+  - the agent shell (the Claude app) has Screen Recording but not Accessibility;
+  - a `.app` launched with `open` runs under its own TCC identity, which is useful for probing what
+    works with no permission.
+- **The screen locks after 20 minutes idle,** and a locked screen stops live tests (the self-test
+  refuses to run then). For long unattended runs, keep the Mac awake with `caffeinate -u`.
+- **macOS 27 may not draw `NSMenuItem.image`,** so the status line draws its own dot. This came from
+  an in-process capture the maintainer's typing may have disturbed; the code works either way.
+
+**From the research before the build:**
 
 These come from research on 2026-09-29, reading the source of three apps: AltTab
 (`lwouis/alt-tab-macos`, GPL-3.0), DockDoor (`ejbills/DockDoor`, GPL-3.0) and WindowLens
@@ -129,12 +162,20 @@ used in this repo's code yet. The detail and API table are in `docs/architecture
 
 ## Known gaps
 
-- No Xcode project, build or tests, so there are no checks. `/handoff-update` says so until a
-  build exists.
-- No remote and no CI.
-- No signing identity has been chosen. macOS ties the Accessibility grant to the code signature,
-  so ad-hoc-signed rebuilds are expected to lose it every time. This is known macOS behaviour but
-  hasn't been hit here yet.
+- **Nothing has passed a live run.** The first run (before the Spaces work) showed the tap and the
+  switcher reader working, and every release passing natively, because no app had two windows on
+  the current Space.
+- **Unverified on macOS 27:**
+  - whether `kAXMainWindow` / `kAXFocusedWindow` reach windows on other Spaces;
+  - how long the remote-token scan takes for Chrome;
+  - whether the full focus sequence slides to another Space;
+  - whether a lone make-key mouse down leaves an app thinking the button is held;
+  - tag bit 60 for minimized windows.
+
+  The self-test and the logs are designed to answer these.
+- **Input Monitoring:** still open whether the tap needs it besides Accessibility.
+- **Signing:** see Next action 1.
+- **No CI.** The build check is run by hand.
 
 ## Safety constraints
 
