@@ -9,7 +9,7 @@ extension SelfTest {
         try await scenario("synthetic-cmd-tab", timeout: 8) { try await syntheticCommandTab($0) }
         guard !dockIgnoresSyntheticKeys else {
             let reason = "the Dock ignores synthetic ⌘⇥"
-            for name in ["single-native", "dots", "list-opens", "esc-cancels", "pick-s", "pick-a", "arrows-return",
+            for name in ["single-native", "stack-edges", "list-opens", "esc-cancels", "pick-s", "pick-a", "arrows-return",
                          "cmd-tab-again", "cmd-tap-cancels", "quick-tap-native", "timeout-16s"] {
                 try await scenario(name, skip: reason) { _ in }
             }
@@ -27,7 +27,7 @@ extension SelfTest {
         try await scenario("single-native", skip: targets.single == nil ? "no other app has exactly one window" : nil) {
             try await singleNative($0)
         }
-        try await scenario("dots") { try await dotsWhileCycling($0) }
+        try await scenario("stack-edges") { try await stackEdgesWhileCycling($0) }
         try await scenario("list-opens", skip: noMulti) { try await listOpens($0) }
         try await scenario("esc-cancels", skip: noMulti) { try await escapeCancels($0) }
         try await scenario("pick-s", skip: noMulti) {
@@ -115,9 +115,9 @@ extension SelfTest {
         try await checkCommandUp(run)
     }
 
-    // MARK: 2. Dots while cycling
+    // MARK: 2. Stack edges while cycling
 
-    private func dotsWhileCycling(_ run: ScenarioRun) async throws {
+    private func stackEdgesWhileCycling(_ run: ScenarioRun) async throws {
         refreshWindows()
         guard try await restoreHome(run), try await openSwitcher(run) != nil else { return }
         var problems: [String] = []
@@ -125,7 +125,7 @@ extension SelfTest {
         let matched = try await waitFor(1, every: 0.03, run) {
             guard let switcher = await self.switcher(items: true) else { return false }
             last = switcher
-            problems = self.dotProblems(switcher)
+            problems = self.stackEdgeProblems(switcher)
             return problems.isEmpty
         }
         run.ms = matched
@@ -133,34 +133,47 @@ extension SelfTest {
         if let last {
             let expected = last.items.compactMap(\.pid).filter { (windowsByPid[$0]?.count ?? 0) >= 2 }.count
             let unmatched = last.items.filter { $0.pid == nil }.count
-            run.note("\(last.items.count) icons, \(expected) with dots expected, \(unmatched) not matched to an app")
-            if expected > 0 { run.check(dots?.isVisible == true, "the dots panel isn't visible") }
+            run.note("\(last.items.count) icons, \(expected) with stack edges expected, \(unmatched) not matched to an app")
+            if expected > 0 { run.check(stackEdges?.isVisible == true, "the stack edges panel isn't visible") }
+            // AX points, top-left origin, so they line up with a screenshot of the main display.
+            let frames = last.items.compactMap(\.frame).map(Self.describe).joined(separator: ", ")
+            run.note("AX frames: switcher \(last.frame.map(Self.describe) ?? "?"), icons \(frames)")
         }
         run.note("phase \(phase)")
-        try await checkpoint("dots", run)
+        try await checkpoint("stack-edges", run)
     }
 
-    /// Wrong counts and misplaced dots, by bundle id. Empty when everything matches.
-    private func dotProblems(_ switcher: SelfTestSwitcher) -> [String] {
-        let state = dots
+    /// "x,y w×h", in whole points.
+    private static func describe(_ rect: CGRect) -> String {
+        "\(Int(rect.minX)),\(Int(rect.minY)) \(Int(rect.width))×\(Int(rect.height))"
+    }
+
+    /// Wrong counts and misplaced stack edges, by bundle id. Empty when everything matches.
+    private func stackEdgeProblems(_ switcher: SelfTestSwitcher) -> [String] {
+        let state = stackEdges
         let visible = state?.isVisible ?? false
         var problems: [String] = []
         for item in switcher.items {
             guard let pid = item.pid, let bundle = bundleByPid[pid], let axFrame = item.frame else { continue }
             let frame = appKitRect(axFrame)
-            let expected = SelfTestPlan.expectedDots(windows: windowsByPid[pid]?.count ?? 0, maxDots: DotsOverlay.maxDots)
+            let expected = SelfTestPlan.expectedStackEdges(
+                windows: windowsByPid[pid]?.count ?? 0, maxEdges: StackEdgesOverlay.maxEdges)
             let icon = state?.icons
                 .filter { hypot($0.frame.midX - frame.midX, $0.frame.midY - frame.midY) <= 8 }
                 .min { hypot($0.frame.midX - frame.midX, $0.frame.midY - frame.midY)
                     < hypot($1.frame.midX - frame.midX, $1.frame.midY - frame.midY) }
-            let shown = visible ? icon?.dotCount ?? 0 : 0
+            let shown = visible ? icon?.edgeCount ?? 0 : 0
             if shown != expected {
-                problems.append("\(bundle) shows \(shown) dots, expected \(expected)")
-            } else if shown > 0, let dots = icon?.dotsFrame {
-                let dx = dots.midX - frame.midX
-                let dy = dots.midY - frame.minY
-                if abs(dx) > 6 || dy < -16 || dy > frame.height / 2 {
-                    problems.append("\(bundle)'s dots are off their icon (dx \(Int(dx)), dy \(Int(dy)) from the icon's bottom centre)")
+                problems.append("\(bundle) shows \(shown) stack edges, expected \(expected)")
+            } else if shown > 0, let edges = icon?.edgesFrame {
+                // Centred on the icon, and inside the Dock's highlight: the frame inset by 4 pt.
+                let dx = edges.midX - frame.midX
+                let headroom = frame.maxY - edges.maxY
+                if abs(dx) > 2 || headroom < 4 || edges.minY < frame.midY {
+                    problems.append("""
+                        \(bundle)'s stack edges are off their icon (dx \(Int(dx)), \(Int(headroom)) pt below the \
+                        icon frame's top)
+                        """)
                 }
             }
         }
@@ -187,7 +200,7 @@ extension SelfTest {
         let known = Set(windows.map(\.id))
         let unknown = ids.filter { !known.contains($0) }.count
         run.check(unknown == 0, "\(unknown) listed ids aren't real windows of \(bundle(multi)) per SkyLight")
-        run.check(dots?.isVisible == true, "the dots aren't shown during Picking")
+        run.check(stackEdges?.isVisible == true, "the stack edges aren't shown during Picking")
         run.check(frontPid == home?.processIdentifier, "\(bundle(frontPid)) is in front, not the home app")
         let held = await switcher(items: true)
         run.check(held != nil, "the native switcher closed on the release: the hold didn't work")
@@ -402,7 +415,7 @@ extension SelfTest {
         run.check(!state.session, "the session state shows ⌘ down")
         run.check(phase == "idle", "phase is \(phase), not idle")
         run.check(!listVisible, "the list is visible")
-        run.check(dots?.isVisible != true, "the dots are visible")
+        run.check(stackEdges?.isVisible != true, "the stack edges are visible")
         run.check(await switcher() == nil, "the switcher is up")
         if !sawNonIdlePhase { run.note("SelfTestHooks.phase never left idle during the run") }
     }
