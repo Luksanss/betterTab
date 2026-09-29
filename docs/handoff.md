@@ -19,14 +19,19 @@ ticket tracker; the next action below is the backlog.
 ## Working copy state
 
 There are two branches and no remote (see `CLAUDE.md` § Branches, commits and handoffs):
-- **`dev`** is where all work is committed. As of 2026-09-29 it holds `Initial commit` plus
-  three docs commits: the product docs and spec, the repo-local handoff skills, and `CLAUDE.md`
-  with this handoff.
+- **`dev`** is where all work is committed. As of 2026-09-29 it holds `Initial commit` plus four
+  docs commits:
+  - the product docs, spec, architecture and the v5 design brief;
+  - the repo-local handoff skills;
+  - `CLAUDE.md` with this handoff;
+  - a commit restoring those skills to their installed template form (the maintainer doesn't want
+    them edited).
 - **`main`** is the last working version. It's still `087e07e Initial commit`, because nothing
   works yet. It moves when the maintainer says a version works.
 
 No code exists yet. Nothing project-related runs locally. The listeners on :5000 and :7000 are
-macOS AirPlay Receiver (ControlCenter); :37701 is the claude-mem worker. The dev machine: macOS
+macOS AirPlay Receiver (ControlCenter); :37701 is the claude-mem worker; :44950 and :44960 are
+the Figma desktop agent. The dev machine: macOS
 27.0 on Apple Silicon, Xcode 27.0, Swift 6.4. Neither XcodeGen nor Tuist is installed.
 
 ## Next action
