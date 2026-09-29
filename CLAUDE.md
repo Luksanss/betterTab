@@ -25,8 +25,9 @@ One developer, one user, so keep it simple.
 - **Never commit on `main` directly.**
 - **Archive a handoff only at a release,** meaning a merge of `dev` into `main`: copy
   `docs/handoff.md` to `docs/archive/handoffs/<ISO date>.md`, adding a topical suffix if the date
-  is taken. Between releases, `/handoff-update` rewrites `docs/handoff.md` in place and writes no
-  archive.
+  is taken. If the maintainer merges through a GitHub pull request, the next `/handoff-update` on
+  `dev` writes that archive. Between releases, `/handoff-update` rewrites `docs/handoff.md` in
+  place and writes no archive.
 - **The required check is a clean build of both schemes,** Debug and Release, with no warnings in
   our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand.
   ```

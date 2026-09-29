@@ -2,7 +2,7 @@
 
 Working name, taken from the repo. A macOS menu-bar utility: a ⌘⇥ switcher that looks and feels
 like the native one, but lets you pick a specific window when the app you land on has more than
-one open. Written 2026-09-29. Nothing is built yet.
+one open. Written 2026-09-29, before the build.
 
 ## The problem
 
