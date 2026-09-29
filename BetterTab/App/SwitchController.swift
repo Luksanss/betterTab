@@ -133,7 +133,7 @@ final class SwitchController {
                 let pid = listed.pid
                 Task {
                     try? await Task.sleep(for: Self.focusDelay)
-                    Focuser.focus(pid: pid, window: window.element)
+                    Focuser.focus(pid: pid, window: window)
                 }
             }
         }

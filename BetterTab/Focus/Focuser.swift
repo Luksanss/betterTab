@@ -9,8 +9,9 @@ enum Focuser {
     ///
     /// Returns at once. The work runs on a serial queue, because each AX call can wait up to the
     /// AX timeout on a slow app.
-    static func focus(pid: pid_t, window: AXUIElement) {
-        let target = Target(pid: pid, window: window, start: now())
+    static func focus(pid: pid_t, window: AppWindow) {
+        guard let element = window.element else { return }
+        let target = Target(pid: pid, window: element, start: now())
         queue.async { run(target) }
     }
 

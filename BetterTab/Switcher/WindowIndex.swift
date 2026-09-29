@@ -3,10 +3,13 @@ import ApplicationServices
 import Synchronization
 import os
 
-/// One standard window of an app.
+/// One real window of an app, on any Space.
 struct AppWindow: @unchecked Sendable {
-    /// AX elements are safe to use from any thread.
-    let element: AXUIElement
+    let windowID: CGWindowID
+    /// nil until AX has resolved the window; windows on other Spaces may need a remote-token scan.
+    /// Focusing works without it. AX elements are safe to use from any thread.
+    let element: AXUIElement?
+    /// Empty while unknown.
     let title: String
     let isMinimized: Bool
 }
@@ -141,7 +144,8 @@ final class WindowIndex {
 
 private extension AppWindow {
     init(_ raw: RawWindow) {
-        self.init(element: raw.element, title: raw.title, isMinimized: raw.isMinimized)
+        self.init(windowID: FocusSymbols.windowID(of: raw.element) ?? 0, element: raw.element,
+                  title: raw.title, isMinimized: raw.isMinimized)
     }
 }
 
