@@ -35,9 +35,10 @@ One developer, one user, so keep it simple.
 - **The project is a plain Xcode project with synchronized folders.** Files added under
   `BetterTab/` or `Experiment/` join their target automatically, so `project.pbxproj` rarely
   needs editing. `Experiment` is the throwaway target for `docs/architecture.md` § The experiment.
-- **Builds are ad-hoc signed** because this Mac has no signing identity. macOS then drops the
-  Accessibility grant on every rebuild; re-grant it in System Settings → Privacy & Security.
-  Agents can't grant it, so a live test needs the maintainer's grant on that exact build.
+- **Builds are signed with the maintainer's Apple Development certificate** (Personal Team
+  `5KDU5HYH35`), so the Accessibility grant survives rebuilds. Only the maintainer can grant it;
+  agents never change security settings. If signing ever fails for a new target or bundle ID, add
+  `-allowProvisioningUpdates` once.
 - **Debug builds have a self-test** that drives ⌘⇥ end to end with synthetic keys and writes a
   report without titles. Quit BetterTab first, then run
   `open -g build/DerivedData/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`

@@ -30,11 +30,9 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Make grants survive rebuilds.** Every rebuild is ad-hoc signed (designated requirement =
-   cdhash), so macOS drops the Accessibility grant each time, and agents can't grant it. The
-   maintainer signs in to Xcode (Settings → Accounts → + → Apple ID, then Manage Certificates → +
-   Apple Development). Then an agent sets `DEVELOPMENT_TEAM` and `CODE_SIGN_IDENTITY = Apple
-   Development` for both targets, reading the team id from the certificate's OU.
+1. **Done: grants survive rebuilds.** Both targets are now signed with the maintainer's Apple
+   Development certificate (Personal Team `5KDU5HYH35`). The designated requirement is the
+   certificate and bundle ID instead of a cdhash.
 2. **The maintainer grants the new build once** (System Settings → Privacy & Security →
    Accessibility; remove the old BetterTab entry, add the new one) and launches it.
 3. **Run the self-test** while nobody is using the Mac (see `CLAUDE.md`). Iterate on its report.
@@ -174,7 +172,6 @@ used in this repo's code yet. The detail and API table are in `docs/architecture
 
   The self-test and the logs are designed to answer these.
 - **Input Monitoring:** still open whether the tap needs it besides Accessibility.
-- **Signing:** see Next action 1.
 - **No CI.** The build check is run by hand.
 
 ## Safety constraints
