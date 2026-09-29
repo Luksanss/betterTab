@@ -4,7 +4,7 @@ import Synchronization
 import os
 
 /// One real window of an app, on any Space.
-struct AppWindow: @unchecked Sendable {
+nonisolated struct AppWindow: @unchecked Sendable {
     let windowID: CGWindowID
     /// nil until AX has resolved the window; windows on other Spaces may need a remote-token scan.
     /// Focusing works without it. AX elements are safe to use from any thread.
@@ -12,31 +12,80 @@ struct AppWindow: @unchecked Sendable {
     /// Empty while unknown.
     let title: String
     let isMinimized: Bool
+    /// The Space it's on, or 0 if unknown.
+    let spaceID: UInt64
+    let isFullScreen: Bool
+
+    init(
+        windowID: CGWindowID, element: AXUIElement?, title: String, isMinimized: Bool,
+        spaceID: UInt64 = 0, isFullScreen: Bool = false
+    ) {
+        self.windowID = windowID
+        self.element = element
+        self.title = title
+        self.isMinimized = isMinimized
+        self.spaceID = spaceID
+        self.isFullScreen = isFullScreen
+    }
+
+    /// This window, with the title and element of `earlier` where it has none of its own.
+    func filling(from earlier: AppWindow) -> AppWindow {
+        AppWindow(
+            windowID: windowID, element: element ?? earlier.element, title: title.isEmpty ? earlier.title : title,
+            isMinimized: isMinimized, spaceID: spaceID, isFullScreen: isFullScreen)
+    }
+
+    /// Whether two lists would give the same rows and the same focus targets.
+    static func sameRows(_ a: [AppWindow], _ b: [AppWindow]) -> Bool {
+        a.count == b.count && zip(a, b).allSatisfy { a, b in
+            a.windowID == b.windowID && a.title == b.title && a.isMinimized == b.isMinimized
+                && (a.element == nil) == (b.element == nil) && a.spaceID == b.spaceID && a.isFullScreen == b.isFullScreen
+        }
+    }
 }
 
-/// Reads apps' standard windows through AX, off the main actor. Results arrive on the main actor.
+/// Every app's real windows on every Space. SkyLight says which windows exist, with no
+/// permission; AX adds titles and elements. The work runs off the main actor; results arrive on
+/// it. Nothing runs between sessions apart from the one-shot warm-ups.
 final class WindowIndex {
+    /// Remote-token scanning time per app per load.
+    static let scanBudget = 0.060
+    /// The warm-up's, which nothing waits for.
+    static let warmUpScanBudget = 0.250
+
     private struct Load {
         let onResult: (pid_t, [AppWindow]) -> Void
         let startedAt: UInt64
         var remaining: Int
-        var failed = 0
+        var answered = 0
+        var unanswered = 0
+        var skipped = 0
     }
 
     /// Handlers stay here on the main actor; the readers only send back a load id.
     private var loads: [UInt64: Load] = [:]
     private var nextLoadID: UInt64 = 0
     private let epoch = LoadEpoch()
+    private let cache = ElementCache()
     private let readers = DispatchQueue(
         label: "com.luksanss.BetterTab.WindowIndex", qos: .userInitiated, attributes: .concurrent)
+    private let scans = DispatchQueue(
+        label: "com.luksanss.BetterTab.WindowIndex.scan", qos: .userInitiated, attributes: .concurrent)
+    private var warmedUp = false
 
     private var watchThread: AXObserverThread?
     private var watchHandler: (([AppWindow]) -> Void)?
     private var watchToken: UInt64 = 0
     private var terminationObserver: (any NSObjectProtocol)?
 
-    /// Reads each app's standard windows in parallel, front to back, with a 250 ms AX timeout
-    /// per call; a hung app just gets no result. `onResult` fires once per app as it finishes.
+    init() {
+        SkyLightWindows.warmUp()
+    }
+
+    /// Reads each app's windows. `onResult` fires straight away with SkyLight's windows (titles
+    /// empty, elements from the cache), then again for an app whenever AX or the remote-token
+    /// scan changes what it has: titles, elements, windows that turn out not to be standard. An
+    /// app with no real window gets no call. A hung app keeps SkyLight's untitled windows.
     func load(pids: [pid_t], onResult: @escaping (pid_t, [AppWindow]) -> Void) {
         var seen = Set<pid_t>()
         let pids = pids.filter { $0 > 0 && seen.insert($0).inserted }
@@ -46,33 +95,51 @@ final class WindowIndex {
         loads[id] = Load(onResult: onResult, startedAt: DispatchTime.now().uptimeNanoseconds, remaining: pids.count)
         let epoch = epoch
         let wanted = epoch.current
-        for pid in pids {
-            readers.async { [weak self] in
-                // Skipped outright if `cancel()` came first, so nothing lingers after it.
-                let read: WindowRead = epoch.current == wanted
-                    ? WindowReader.read(pid, isWanted: { epoch.current == wanted }) : .failed
+        WindowLoader(
+            cache: cache, readers: readers, scans: scans, scanBudget: Self.scanBudget,
+            // Checked before every step and every scanned id, so nothing lingers after `cancel()`.
+            isWanted: { epoch.current == wanted },
+            deliver: { [weak self] pid, windows in
                 DispatchQueue.main.async {
-                    MainActor.assumeIsolated { self?.finished(load: id, pid: pid, read: read) }
+                    MainActor.assumeIsolated { self?.loads[id]?.onResult(pid, windows) }
+                }
+            },
+            finished: { [weak self] pid, answer in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self?.finished(load: id, answer: answer) }
                 }
             }
-        }
+        ).start(pids)
     }
 
-    /// While the list is open: calls `onChange` with the app's fresh windows whenever one is
-    /// created, closed, minimized or restored. Replaces any earlier watch.
+    /// Once, when BetterTab first has Accessibility: resolves the apps' windows, with a longer
+    /// scan, so the first ⌘⇥ finds their elements cached. Delivers nothing.
+    func warmUp(pids: [pid_t]) {
+        guard !warmedUp else { return }
+        warmedUp = true
+        WindowLoader(
+            cache: cache, readers: readers, scans: scans, scanBudget: Self.warmUpScanBudget,
+            isWanted: { true }, deliver: { _, _ in }, finished: { _, _ in }
+        ).start(pids)
+    }
+
+    /// While the list is open: calls `onChange` with the app's fresh windows whenever one on the
+    /// current Space is created, or any known one is closed, minimized or restored. Replaces any
+    /// earlier watch.
     func watch(pid: pid_t, onChange: @escaping ([AppWindow]) -> Void) {
-        stopWatch()
+        stopWatching()
         let token = watchToken
         watchHandler = onChange
-        let deliver: @Sendable (WindowRead) -> Void = { [weak self] read in
+        let deliver: @Sendable (WatchRead) -> Void = { [weak self] read in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated { self?.watchRead(read, token: token) }
             }
         }
+        let cache = cache
         let thread = AXObserverThread()
         watchThread = thread
         thread.start(name: "BetterTab.WindowIndex.watch", qos: .userInitiated) { thread in
-            WindowWatch.make(pid: pid, thread: thread, deliver: deliver)
+            WindowWatch.make(pid: pid, cache: cache, thread: thread, deliver: deliver)
         }
         // AX says nothing reliable when a whole app quits, so this covers it.
         terminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -90,49 +157,8 @@ final class WindowIndex {
         }
     }
 
-    /// Drops pending results and any watch. Idempotent.
-    func cancel() {
-        epoch.advance()
-        loads.removeAll()
-        stopWatch()
-    }
-
-    private func finished(load id: UInt64, pid: pid_t, read: WindowRead) {
-        guard var load = loads[id] else { return }
-        load.remaining -= 1
-        let windows: [AppWindow]?
-        if case .windows(let raw) = read {
-            windows = raw.map(AppWindow.init)
-        } else {
-            windows = nil
-            load.failed += 1
-        }
-        if load.remaining > 0 {
-            loads[id] = load
-        } else {
-            loads[id] = nil
-            let ms = (DispatchTime.now().uptimeNanoseconds &- load.startedAt) / 1_000_000
-            windowsLog.debug("""
-                windows read in \(ms, privacy: .public) ms; \(load.failed, privacy: .public) apps gave no result
-                """)
-        }
-        if let windows { load.onResult(pid, windows) }
-    }
-
-    private func watchRead(_ read: WindowRead, token: UInt64) {
-        guard token == watchToken, let handler = watchHandler else { return }
-        switch read {
-        case .windows(let raw):
-            handler(raw.map(AppWindow.init))
-        case .gone:
-            stopWatch()
-            handler([])
-        case .failed:
-            break
-        }
-    }
-
-    private func stopWatch() {
+    /// Ends the watch only; loads carry on. Idempotent.
+    func stopWatching() {
         watchToken &+= 1
         watchThread?.stop()
         watchThread = nil
@@ -140,66 +166,56 @@ final class WindowIndex {
         terminationObserver = nil
         watchHandler = nil
     }
-}
 
-private extension AppWindow {
-    init(_ raw: RawWindow) {
-        self.init(windowID: FocusSymbols.windowID(of: raw.element) ?? 0, element: raw.element,
-                  title: raw.title, isMinimized: raw.isMinimized)
+    /// Drops pending results, stops scans and any watch. Idempotent.
+    func cancel() {
+        epoch.advance()
+        loads.removeAll()
+        stopWatching()
+    }
+
+    private func finished(load id: UInt64, answer: AXAnswer?) {
+        guard var load = loads[id] else { return }
+        load.remaining -= 1
+        switch answer {
+        case nil: load.skipped += 1
+        case .answered?: load.answered += 1
+        default: load.unanswered += 1
+        }
+        loads[id] = load
+        guard load.remaining == 0 else { return }
+        let ms = (DispatchTime.now().uptimeNanoseconds &- load.startedAt) / 1_000_000
+        windowsLog.debug("""
+            windows read in \(ms, privacy: .public) ms: AX answered for \(load.answered, privacy: .public) apps, \
+            gave no answer for \(load.unanswered, privacy: .public), \(load.skipped, privacy: .public) needed none
+            """)
+    }
+
+    private func watchRead(_ read: WatchRead, token: UInt64) {
+        guard token == watchToken, let handler = watchHandler else { return }
+        switch read {
+        case .windows(let windows):
+            handler(windows)
+        case .gone:
+            stopWatching()
+            handler([])
+        }
     }
 }
 
-// MARK: - Reading, off the main actor
+// MARK: - Off the main actor
 
-nonisolated private let windowsLog = Logger(subsystem: "com.luksanss.BetterTab", category: "windows")
-
-/// Bumped by `cancel()`, and read by readers that haven't started yet.
+/// Bumped by `cancel()`, and read by readers and scans.
 nonisolated private final class LoadEpoch: Sendable {
     private let value = Atomic<UInt64>(0)
     var current: UInt64 { value.load(ordering: .relaxed) }
     func advance() { _ = value.wrappingAdd(1, ordering: .relaxed) }
 }
 
-/// An `AppWindow` before it reaches the main actor. A thin AX wrapper, safe on any thread.
-nonisolated private struct RawWindow: @unchecked Sendable {
-    let element: AXUIElement
-    let title: String
-    let isMinimized: Bool
-}
-
-nonisolated private enum WindowRead: Sendable {
-    case windows([RawWindow])
-    /// Timed out or refused; the caller gets nothing rather than a guess.
-    case failed
+nonisolated private enum WatchRead: Sendable {
+    case windows([AppWindow])
     /// The app is gone.
     case gone
-}
-
-nonisolated private enum WindowReader {
-    /// `docs/architecture.md` § Which windows count: standard windows only, minimized included,
-    /// in AX's front-to-back order.
-    static func read(_ pid: pid_t, isWanted: () -> Bool) -> WindowRead {
-        let app = AXCall.application(pid)
-        let (elements, error) = AXCall.elements(app, kAXWindowsAttribute)
-        switch error {
-        case .success, .noValue: break
-        case .invalidUIElement: return .gone
-        default: return .failed
-        }
-        var windows: [RawWindow] = []
-        for element in elements {
-            guard isWanted() else { return .failed }
-            let (subrole, error) = AXCall.string(element, kAXSubroleAttribute)
-            // A hung app would cost 250 ms per window; a partial list would be wrong anyway.
-            if error == .cannotComplete { return .failed }
-            guard subrole == kAXStandardWindowSubrole else { continue }
-            windows.append(RawWindow(
-                element: element,
-                title: AXCall.string(element, kAXTitleAttribute).string ?? "",
-                isMinimized: AXCall.bool(element, kAXMinimizedAttribute) ?? false))
-        }
-        return .windows(windows)
-    }
 }
 
 // MARK: - Watching one app, on its own thread
@@ -229,20 +245,24 @@ nonisolated private func windowWatchTimerCallback(_ timer: CFRunLoopTimer?, _ in
     Unmanaged<WindowWatch>.fromOpaque(info).takeUnretainedValue().reread()
 }
 
-/// Lives on its thread only.
+/// Lives on its thread only. AX observes the windows it has elements for, which includes those
+/// on other Spaces that the cache has resolved; each read asks SkyLight too, so a window closed
+/// anywhere drops out.
 nonisolated private final class WindowWatch: AXObserverWorker {
     private let pid: pid_t
+    private let cache: ElementCache
     private let thread: AXObserverThread
-    private let deliver: @Sendable (WindowRead) -> Void
+    private let deliver: @Sendable (WatchRead) -> Void
     private let app: AXUIElement
     private let observer: AXObserver
-    /// Windows with notifications registered, re-registered after each read.
+    /// Windows with notifications registered, updated after each answered read.
     private var windows: [AXUIElement] = []
+    private var delivered: [AppWindow]?
     private var pending: CFRunLoopTimer?
     private var retries = 0
 
     static func make(
-        pid: pid_t, thread: AXObserverThread, deliver: @escaping @Sendable (WindowRead) -> Void
+        pid: pid_t, cache: ElementCache, thread: AXObserverThread, deliver: @escaping @Sendable (WatchRead) -> Void
     ) -> WindowWatch? {
         var created: AXObserver?
         let result = AXObserverCreate(pid, windowWatchCallback, &created)
@@ -251,11 +271,15 @@ nonisolated private final class WindowWatch: AXObserverWorker {
             windowsLog.error("AXObserverCreate for the listed app failed (\(result.rawValue, privacy: .public))")
             return nil
         }
-        return WindowWatch(pid: pid, observer: created, thread: thread, deliver: deliver)
+        return WindowWatch(pid: pid, cache: cache, observer: created, thread: thread, deliver: deliver)
     }
 
-    private init(pid: pid_t, observer: AXObserver, thread: AXObserverThread, deliver: @escaping @Sendable (WindowRead) -> Void) {
+    private init(
+        pid: pid_t, cache: ElementCache, observer: AXObserver, thread: AXObserverThread,
+        deliver: @escaping @Sendable (WatchRead) -> Void
+    ) {
         self.pid = pid
+        self.cache = cache
         self.thread = thread
         self.deliver = deliver
         self.observer = observer
@@ -267,16 +291,7 @@ nonisolated private final class WindowWatch: AXObserverWorker {
         }
         // This read finds which windows to observe. It's delivered too, because the caller's
         // windows were read when the switcher opened, and the app may have lost some since.
-        let read = WindowReader.read(pid, isWanted: { !thread.isStopRequested })
-        switch read {
-        case .windows(let raw):
-            register(raw.map(\.element))
-            deliver(read)
-        case .gone:
-            deliver(.gone)
-            thread.stop()
-        case .failed: scheduleReread(after: WatchTiming.retryDelay)
-        }
+        read()
         windowsLog.debug("watching the listed app: \(self.windows.count, privacy: .public) windows observed")
     }
 
@@ -294,21 +309,39 @@ nonisolated private final class WindowWatch: AXObserverWorker {
 
     fileprivate func reread() {
         pending = nil
+        read()
+    }
+
+    private func read() {
+        let thread = thread
         guard !thread.isStopRequested else { return }
-        let read = WindowReader.read(pid) { !thread.isStopRequested }
-        switch read {
-        case .windows(let raw):
-            retries = 0
-            register(raw.map(\.element))
-            deliver(read)
+        let real = SkyLightWindows.snapshot().map { $0.windowsByPid[pid] ?? [] }
+        let pass = WindowReader.axPass(
+            pid: pid, real: real.map { Set($0.map(\.windowID)) }, cache: cache, isWanted: { !thread.isStopRequested })
+        switch pass.answer {
         case .gone:
-            deliver(read)
+            deliver(.gone)
             thread.stop()
-        case .failed:
-            guard retries < WatchTiming.retryLimit else { return }
-            retries += 1
-            scheduleReread(after: WatchTiming.retryDelay)
+            return
+        case .answered:
+            retries = 0
+            register(pass.facts.values.map(\.element.element))
+        case .noAnswer:
+            if retries < WatchTiming.retryLimit {
+                retries += 1
+                scheduleReread(after: WatchTiming.retryDelay)
+            }
+        case .unavailable:
+            break
         }
+        // Without SkyLight, an app that didn't answer has nothing to show, and saying so would
+        // close the list.
+        guard real != nil || pass.answer == .answered else { return }
+        let windows = WindowReader.windows(
+            real: real, pass: pass, cached: cache.elements(of: pid), cachedFront: cache.front(of: pid))
+        if let delivered, AppWindow.sameRows(delivered, windows) { return }
+        delivered = windows
+        deliver(.windows(windows))
     }
 
     private func register(_ current: [AXUIElement]) {

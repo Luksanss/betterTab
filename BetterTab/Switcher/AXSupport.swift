@@ -41,6 +41,42 @@ nonisolated enum AXCall {
         value(element, attribute).value as? Bool
     }
 
+    /// Several attributes in one round trip. AX reports a missing value inside the array rather
+    /// than as the call's result, so each one comes back with its own error.
+    static func values(_ element: AXUIElement, _ attributes: [String]) -> (values: [CFTypeRef?], errors: [AXError], error: AXError) {
+        var raw: CFArray?
+        let error = AXUIElementCopyMultipleAttributeValues(element, attributes as CFArray, [], &raw)
+        guard error == .success, let array = raw as? [CFTypeRef], array.count == attributes.count else {
+            let failed = error == .success ? AXError.failure : error
+            return (Array(repeating: nil, count: attributes.count), Array(repeating: failed, count: attributes.count), failed)
+        }
+        var values: [CFTypeRef?] = []
+        var errors: [AXError] = []
+        for value in array {
+            if let code = embeddedError(value) {
+                values.append(nil)
+                errors.append(code)
+            } else {
+                values.append(value)
+                errors.append(.success)
+            }
+        }
+        return (values, errors, .success)
+    }
+
+    /// The value as an element, or nil if it's anything else (such as an embedded error).
+    static func asElement(_ value: CFTypeRef?) -> AXUIElement? {
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
+    }
+
+    private static func embeddedError(_ value: CFTypeRef) -> AXError? {
+        guard CFGetTypeID(value) == AXValueGetTypeID(), AXValueGetType(value as! AXValue) == .axError else { return nil }
+        var code: Int32 = 0
+        guard AXValueGetValue(value as! AXValue, .axError, &code) else { return .failure }
+        return AXError(rawValue: code) ?? .failure
+    }
+
     /// AX's own top-left global coordinates.
     static func frame(_ element: AXUIElement) -> CGRect? {
         guard let position = value(element, kAXPositionAttribute).value,
@@ -71,6 +107,11 @@ nonisolated enum AXCall {
 }
 
 nonisolated struct AXRunLoopRef: @unchecked Sendable { let loop: CFRunLoop }
+
+/// An AX element in Sendable state. AX elements are safe to use from any thread.
+nonisolated struct AXElement: @unchecked Sendable {
+    let element: AXUIElement
+}
 
 /// Whatever an `AXObserverThread` runs. Created, used and torn down on that thread only, so it
 /// needn't be Sendable; AX and timer callbacks reach it through an unretained refcon.

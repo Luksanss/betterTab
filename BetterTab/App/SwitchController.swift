@@ -29,14 +29,19 @@ final class SwitchController {
         case picking(session: UInt64)
     }
 
-    private var phase = Phase.idle
+    private var phase = Phase.idle {
+        didSet { publishForSelfTest() }
+    }
     /// The newest tap generation seen. Messages older than it are late and dropped.
     private var latestGeneration: UInt64 = 0
-    /// Each app's standard windows, front to back, only while the switcher is open.
+    /// Each app's real windows on every Space, in list order, only while the switcher is open.
     private var windowsByPid: [pid_t: [AppWindow]] = [:]
     private var requestedPids: Set<pid_t> = []
-    /// The app the list shows, and the windows `WindowListAction.pick` indexes.
-    private var listed: (pid: pid_t, windows: [AppWindow])?
+    /// The app the list shows, and the windows `WindowListAction.pick` indexes. Set after the list
+    /// has its rows, so the self-test hooks read the rows that match.
+    private var listed: (pid: pid_t, windows: [AppWindow])? {
+        didSet { publishForSelfTest() }
+    }
     /// Bumped whenever results already asked of the index go stale.
     private var epoch = 0
     private var pickingStartedAt: ContinuousClock.Instant?
@@ -56,6 +61,8 @@ final class SwitchController {
             tap.stop()
         } else {
             tap.start()
+            // Once only: the index ignores later calls.
+            index.warmUp(pids: Self.regularAppPids())
         }
     }
 
@@ -85,6 +92,9 @@ final class SwitchController {
     private func startCycle() {
         reset()
         phase = .cycling
+        // Every app, not just those the switcher lists, so the counts are ready by the time it
+        // appears (150–210 ms later).
+        load(Self.regularAppPids())
         watcher.begin()
     }
 
@@ -103,14 +113,19 @@ final class SwitchController {
             end(.confirm, session: session)
             return
         }
-        listed = (pid, windows)
         list.show(windows: windows.map(Self.listItem), switcherFrame: snapshot.frame,
                   iconFrame: item.frame, screen: screen)
+        listed = (pid, windows)
         let epoch = epoch
         index.watch(pid: pid) { [weak self] windows in
             self?.listedWindowsChanged(windows, pid: pid, epoch: epoch)
         }
-        logger.info("Picking: listing \(windows.count, privacy: .public) windows")
+        logger.info("""
+            Picking: listing \(windows.count, privacy: .public) windows, \
+            \(windows.count(where: \.isFullScreen), privacy: .public) full-screen, \
+            \(windows.count(where: { $0.element == nil }), privacy: .public) without an AX element, \
+            \(windows.count(where: { $0.title.isEmpty }), privacy: .public) untitled
+            """)
     }
 
     private func key(_ code: UInt16, session: UInt64) {
@@ -133,6 +148,9 @@ final class SwitchController {
                 let pid = listed.pid
                 Task {
                     try? await Task.sleep(for: Self.focusDelay)
+                    #if DEBUG
+                    SelfTestHooks.focusRequests.append((pid: pid, windowID: window.windowID))
+                    #endif
                     Focuser.focus(pid: pid, window: window)
                 }
             }
@@ -147,11 +165,8 @@ final class SwitchController {
         list.hide()
         listed = nil
         phase = .cycling
-        // Stops the window watch. Loads still pending go with it, so ask again for the apps
-        // that have no count yet.
-        index.cancel()
-        epoch += 1
-        requestedPids = Set(windowsByPid.keys)
+        // Loads carry on: their later titles and scans are still wanted.
+        index.stopWatching()
         if let snapshot = watcher.current {
             loadCounts(snapshot)
             showDots(snapshot)
@@ -217,12 +232,15 @@ final class SwitchController {
         reset()
     }
 
-    /// Reads the windows of every listed app not asked about yet, in parallel.
+    /// Backstop for a switcher icon whose app wasn't among the regular apps at ⌘⇥.
     private func loadCounts(_ snapshot: SwitcherSnapshot) {
-        var pids: [pid_t] = []
-        for item in snapshot.items {
-            if let pid = item.pid, requestedPids.insert(pid).inserted { pids.append(pid) }
-        }
+        load(snapshot.items.compactMap(\.pid))
+    }
+
+    /// Reads the windows of the apps not asked about yet, in parallel. Each app's result can come
+    /// more than once, as titles and windows on other Spaces resolve.
+    private func load(_ pids: [pid_t]) {
+        let pids = pids.filter { requestedPids.insert($0).inserted }
         guard !pids.isEmpty else { return }
         let epoch = epoch
         index.load(pids: pids) { [weak self] pid, windows in
@@ -232,6 +250,10 @@ final class SwitchController {
 
     private func windowsLoaded(_ windows: [AppWindow], pid: pid_t, epoch: Int) {
         guard epoch == self.epoch, phase != .idle else { return }
+        if case .picking(let session) = phase, listed?.pid == pid {
+            listedAppChanged(windows, session: session)
+            return
+        }
         windowsByPid[pid] = windows
         guard let snapshot = watcher.current else { return }
         showDots(snapshot)
@@ -240,16 +262,41 @@ final class SwitchController {
 
     private func listedWindowsChanged(_ windows: [AppWindow], pid: pid_t, epoch: Int) {
         guard epoch == self.epoch, case .picking(let session) = phase, listed?.pid == pid else { return }
-        windowsByPid[pid] = windows
-        if Self.isGone(pid) {
+        listedAppChanged(windows, session: session)
+    }
+
+    /// Fresh windows for the listed app, from its load or its watch.
+    private func listedAppChanged(_ windows: [AppWindow], session: UInt64) {
+        guard let listed else { return }
+        let merged = Self.keepingRows(of: listed.windows, fresh: windows)
+        windowsByPid[listed.pid] = merged
+        if Self.isGone(listed.pid) {
             end(.cancel, session: session)
-        } else if windows.count < 2 {
+        } else if merged.count < 2 {
             end(.confirm, session: session)
-        } else {
-            listed?.windows = windows
-            list.update(windows: windows.map(Self.listItem))
+        } else if !AppWindow.sameRows(merged, listed.windows) {
+            list.update(windows: merged.map(Self.listItem))
+            self.listed = (listed.pid, merged)
             if let snapshot = watcher.current { showDots(snapshot) }
+            logger.debug("""
+                list updated: \(merged.count, privacy: .public) windows, \
+                \(merged.count(where: { $0.title.isEmpty }), privacy: .public) untitled
+                """)
         }
+    }
+
+    /// While the list is open no letter may move under the user's finger: windows still there keep
+    /// their rows (and their title and element, if the fresh read has none), and new ones go at
+    /// the end. Row A stays first.
+    private static func keepingRows(of shown: [AppWindow], fresh: [AppWindow]) -> [AppWindow] {
+        // Without SkyLight a window AX can't identify has id 0, and ids can't be matched.
+        guard !fresh.contains(where: { $0.windowID == 0 }), !shown.contains(where: { $0.windowID == 0 }) else {
+            return fresh
+        }
+        let byID = Dictionary(fresh.map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
+        let kept = shown.compactMap { old in byID[old.windowID]?.filling(from: old) }
+        let keptIDs = Set(kept.map(\.windowID))
+        return kept + fresh.filter { !keptIDs.contains($0.windowID) }
     }
 
     private func showDots(_ snapshot: SwitcherSnapshot) {
@@ -275,6 +322,28 @@ final class SwitchController {
         }
         let count = snapshot?.selected?.pid.flatMap { windowsByPid[$0]?.count } ?? 0
         tap.holdOnRelease = count >= 2
+    }
+
+    /// What the self-test reads (Debug builds only): the phase, and the listed app's windows in
+    /// row order, row A first, as `list.model.rows` shows them.
+    private func publishForSelfTest() {
+        #if DEBUG
+        switch phase {
+        case .idle: SelfTestHooks.phase = "idle"
+        case .cycling: SelfTestHooks.phase = "cycling"
+        case .picking: SelfTestHooks.phase = "picking"
+        }
+        SelfTestHooks.listedPid = listed?.pid ?? 0
+        SelfTestHooks.listedWindowIDs = listed.map { listed in
+            list.model.rows.compactMap { row in
+                listed.windows.indices.contains(row.windowIndex) ? listed.windows[row.windowIndex].windowID : nil
+            }
+        } ?? []
+        #endif
+    }
+
+    private static func regularAppPids() -> [pid_t] {
+        NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier)
     }
 
     private func screen(containing frame: CGRect) -> NSScreen? {
