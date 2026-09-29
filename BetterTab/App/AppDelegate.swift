@@ -17,6 +17,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         permission.start()
         controller.statusChanged()
+        #if DEBUG
+        let tap = controller.tap
+        statusItem.runSelfTest = { SelfTest.start(.fromMenu, tap: tap) }
+        if let options = SelfTestOptions(arguments: CommandLine.arguments) {
+            SelfTest.start(options, tap: tap)
+        }
+        #endif
     }
 
     /// Quit from the menu comes through here too. The tap goes off, then any owed ⌘ release is

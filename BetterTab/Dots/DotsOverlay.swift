@@ -16,6 +16,9 @@ final class DotsOverlay {
     init() {
         panel.ignoresMouseEvents = true
         panel.contentView = dotsView
+        #if DEBUG
+        Self.debugInstances.append(SelfTestWeak(object: self))
+        #endif
     }
 
     /// Frames are AppKit global coordinates. Showing again replaces the dots, for counts that
@@ -62,3 +65,49 @@ private final class DotsView: NSView {
         }
     }
 }
+
+#if DEBUG
+/// What the self-test reads. Read-only; the geometry repeats `DotsView.draw`'s.
+extension DotsOverlay {
+    struct DebugIcon {
+        /// AppKit global.
+        let frame: CGRect
+        let windowCount: Int
+        /// The dots drawn under this icon.
+        let dotCount: Int
+        /// The row of dots, AppKit global; nil when none are drawn.
+        let dotsFrame: CGRect?
+    }
+
+    struct DebugState {
+        let isVisible: Bool
+        let frame: CGRect
+        let icons: [DebugIcon]
+    }
+
+    fileprivate static var debugInstances: [SelfTestWeak<DotsOverlay>] = []
+
+    /// Every live overlay, oldest first.
+    static var debugStates: [DebugState] {
+        debugInstances.removeAll { $0.object == nil }
+        return debugInstances.compactMap { $0.object?.debugState }
+    }
+
+    var debugState: DebugState {
+        let origin = panel.frame.origin
+        let icons = dotsView.icons.map { icon -> DebugIcon in
+            let frame = icon.frame.offsetBy(dx: origin.x, dy: origin.y)
+            guard icon.windowCount >= 2, !icon.frame.isEmpty else {
+                return DebugIcon(frame: frame, windowCount: icon.windowCount, dotCount: 0, dotsFrame: nil)
+            }
+            let count = min(icon.windowCount, Self.maxDots)
+            let width = CGFloat(count) * Self.dotDiameter + CGFloat(count - 1) * Self.dotGap
+            let centreY = frame.minY + Self.dotCentreAboveIconBottom
+            let dots = CGRect(x: frame.midX - width / 2, y: centreY - Self.dotDiameter / 2,
+                              width: width, height: Self.dotDiameter)
+            return DebugIcon(frame: frame, windowCount: icon.windowCount, dotCount: count, dotsFrame: dots)
+        }
+        return DebugState(isVisible: panel.isVisible, frame: panel.frame, icons: icons)
+    }
+}
+#endif

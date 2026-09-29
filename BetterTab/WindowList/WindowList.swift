@@ -33,6 +33,9 @@ final class WindowList {
         panel.contentView?.addSubview(listView)
         listView.onHover = { [weak self] row in self?.hover(row) }
         listView.onClick = { [weak self] row in self?.click(row) }
+        #if DEBUG
+        Self.debugInstances.append(SelfTestWeak(object: self))
+        #endif
     }
 
     /// Opens the list with row A highlighted. Frames are AppKit global coordinates.
@@ -130,3 +133,42 @@ final class WindowList {
         onPick?(model.rows[row].windowIndex)
     }
 }
+
+#if DEBUG
+/// What the self-test reads. Read-only; changes nothing.
+extension WindowList {
+    struct DebugState {
+        let isVisible: Bool
+        let acceptsMouse: Bool
+        /// The list itself, without the transparent margin it rises through. AppKit global.
+        let frame: CGRect
+        let rowCount: Int
+        /// The badges shown, row A first.
+        let labels: [String]
+        let highlight: Int
+        let overflowCount: Int
+        let minimizedRows: Int
+    }
+
+    fileprivate static var debugInstances: [SelfTestWeak<WindowList>] = []
+
+    /// Every live list, oldest first.
+    static var debugStates: [DebugState] {
+        debugInstances.removeAll { $0.object == nil }
+        return debugInstances.compactMap { $0.object?.debugState }
+    }
+
+    var debugState: DebugState {
+        let origin = panel.frame.origin
+        return DebugState(
+            isVisible: panel.isVisible,
+            acceptsMouse: !panel.ignoresMouseEvents,
+            frame: listView.frame.offsetBy(dx: origin.x, dy: origin.y),
+            rowCount: model.rows.count,
+            labels: Array(labels.prefix(model.rows.count)),
+            highlight: model.highlight,
+            overflowCount: model.overflowCount,
+            minimizedRows: model.rows.filter(\.isMinimized).count)
+    }
+}
+#endif

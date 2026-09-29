@@ -18,6 +18,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         ("Can’t find switcher", .switcherNotFound),
     ]
     private var debugStateItems: [NSMenuItem] = []
+    /// Debug › Run Self-Test. Set by AppDelegate.
+    var runSelfTest: (() -> Void)?
     #endif
 
     init(permission: AccessibilityPermission) {
@@ -114,6 +116,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let debug = NSMenu()
         debug.addItem(withTitle: "Preview", action: nil, keyEquivalent: "").submenu = preview
         debug.addItem(withTitle: "Status", action: nil, keyEquivalent: "").submenu = status
+        debug.addItem(.separator())
+        let selfTest = NSMenuItem(title: "Run Self-Test", action: #selector(runSelfTestItem), keyEquivalent: "")
+        selfTest.target = self
+        debug.addItem(selfTest)
 
         let item = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
         item.submenu = debug
@@ -128,6 +134,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func forceState(_ sender: NSMenuItem) {
         forcedState = debugStates[sender.tag].state
         update()
+    }
+
+    @objc private func runSelfTestItem() {
+        runSelfTest?()
     }
     #endif
 }
