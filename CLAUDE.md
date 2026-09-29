@@ -2,8 +2,8 @@
 
 A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
 switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-The menu-bar item and the v5 layers (window list, dots) are built. The switcher integration waits on
-experiment test 0.
+The whole flow is built, including windows on other Spaces, but it has not yet passed a live run;
+see `docs/handoff.md` for where testing stands.
 
 ## Start here
 
@@ -37,6 +37,12 @@ One developer, one user, so keep it simple.
   needs editing. `Experiment` is the throwaway target for `docs/architecture.md` § The experiment.
 - **Builds are ad-hoc signed** because this Mac has no signing identity. macOS then drops the
   Accessibility grant on every rebuild; re-grant it in System Settings → Privacy & Security.
+  Agents can't grant it, so a live test needs the maintainer's grant on that exact build.
+- **Debug builds have a self-test** that drives ⌘⇥ end to end with synthetic keys and writes a
+  report without titles. Quit BetterTab first, then run
+  `open -g build/DerivedData/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
+  (`--long` adds the 15 s timeout test). It presses keys and switches Spaces for about two minutes,
+  so only run it when the maintainer isn't using the Mac, and never with the screen locked.
 
 ## Rules that are expensive to forget
 
