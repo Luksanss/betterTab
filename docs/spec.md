@@ -124,8 +124,8 @@ There's no Dock icon and no windows. Quit is the off switch.
 
 ## Permissions and first launch
 
-- **Accessibility is the only permission.** The first experiment checks whether the key tap also
-  needs Input Monitoring. If it does, that becomes the second and last permission.
+- **Accessibility is the only permission.** The key tap doesn't need Input Monitoring (confirmed
+  live on 2026-09-29). On macOS 27 the pane is titled "Device Control and Data Access".
 - **First launch without the permission:** only the menu-bar item appears, in its
   needs-permission state, and ⌘⇥ is plain native. There's no onboarding window.
 - **When the permission is granted,** BetterTab notices within 2 s, without a restart. **When

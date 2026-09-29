@@ -2,8 +2,8 @@
 
 A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
 switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-The whole flow is built, including windows on other Spaces, but it has not yet passed a live run;
-see `docs/handoff.md` for where testing stands.
+The whole flow is built, including windows on other Spaces, and worked in its first live run; the
+self-test hasn't run yet. See `docs/handoff.md` for where testing stands.
 
 ## Start here
 

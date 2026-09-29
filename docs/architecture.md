@@ -1,7 +1,7 @@
 # BetterTab: architecture
 
-Route A+ is built, on the evidence of test 0 (§ Test 0 results); it hasn't been run end to end
-yet. Research was done on 2026-09-29. Anything marked
+Route A+ is built, on the evidence of test 0 (§ Test 0 results), and worked live on 2026-09-29,
+windows on other Spaces included. Research was done on 2026-09-29. Anything marked
 **(verified)** was either read in the source of an app that ships the technique, or probed
 read-only on the dev machine (macOS 27.0, Xcode 27.0, Swift 6.4, arm64). The three apps are:
 
@@ -105,7 +105,7 @@ flashes less:
 | Need | API | Private? | Permission |
 |---|---|---|---|
 | Find the native switcher, its highlighted app and icon frames | `AXUIElementCreateApplication(dockPid)` → search the children for subrole `AXProcessSwitcherList` → `kAXSelectedChildrenAttribute`, and `kAXPositionAttribute` / `kAXSizeAttribute` of each child; observe `kAXSelectedChildrenChangedNotification` and `kAXUIElementDestroyedNotification` (verified, DockDoor `DockDoor/Utilities/DockObserver+CmdTab.swift`, WindowLens `Sources/Core/Accessibility/DockProcessSwitcherObserver.swift`) | public API, but an undocumented Dock structure | Accessibility |
-| See and swallow keys and ⌘ changes | `CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap)`; return nil to swallow (verified for keys, DockDoor `KeybindHelper.swift`; unverified for the ⌘ release). If the session level isn't early enough, try `.cghidEventTap` | public | Accessibility (verified, AltTab); the experiment checks whether Input Monitoring is needed too |
+| See and swallow keys and ⌘ changes | `CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap)`; return nil to swallow (verified for keys, DockDoor `KeybindHelper.swift`; unverified for the ⌘ release). If the session level isn't early enough, try `.cghidEventTap` | public | Accessibility only (verified live 2026-09-29: no Input Monitoring needed) |
 | Post the synthetic ⌘ release and Esc | `CGEvent(keyboardEventSource:virtualKey:keyDown:)` with `kVK_Command` / `kVK_Escape`, then `.post(tap: .cghidEventTap)` (DockDoor posts to that tap) | public | Accessibility |
 | Windows and titles | `AXUIElementCreateApplication(pid)` → `kAXWindowsAttribute`; for each window `kAXTitleAttribute`, `kAXSubroleAttribute`, `kAXMinimizedAttribute` | public | Accessibility |
 | Letter labels for the user's layout | `UCKeyTranslate` on the current keyboard layout, for key codes `kVK_ANSI_A … kVK_ANSI_L` | public | none |
@@ -253,8 +253,8 @@ Run with the `Experiment` harness (`docs/experiment.md`); the evidence is its lo
 - **The switcher's window** is Dock-owned, full-screen, at layer 20. The `AXProcessSwitcherList`
   is a direct child of the Dock's app element, found 150–210 ms after ⌘⇥. Its items are 128×128 pt
   tiles whose `AXTitle` is the app's name.
-- **Input Monitoring:** still open. Both permissions were granted at once, so the run can't say
-  whether Accessibility alone is enough.
+- **Input Monitoring:** not needed. The run itself granted both at once, but BetterTab's tap later
+  ran with Accessibility alone.
 
 On this evidence route A+ was built. a, e and g are still to be confirmed; they're also covered by
 acceptance tests 7, 14 and 15.
