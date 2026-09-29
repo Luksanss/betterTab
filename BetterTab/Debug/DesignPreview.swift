@@ -150,15 +150,15 @@ private struct PreviewApp {
 
     private static let chromeTitles = [
         "Inbox (24) - Gmail",
-        "Add window list above switcher by lukas-k · Pull Request #412 · koala42/bettertab",
-        "Sprint 34 - BetterTab - Jira",
+        "Add window list above switcher by jdoe · Pull Request #412 · example/bettertab",
+        "Apple Developer Documentation",
     ]
 
     private static let standard: [PreviewApp] = [
         PreviewApp(name: "Slack", bundleID: "com.tinyspeck.slackmacgap", windows: titled("Slack")),
         PreviewApp(name: "Google Chrome", bundleID: chrome, windows: titled(chromeTitles)),
         PreviewApp(name: "Terminal", bundleID: terminal,
-                   windows: titled("lukas — -zsh — 120×40", "bettertab — swift build — 120×40")),
+                   windows: titled("jdoe — -zsh — 120×40", "bettertab — swift build — 120×40")),
         PreviewApp(name: "Visual Studio Code", bundleID: code,
                    windows: titled("WindowList.swift — bettertab", "README.md — dotfiles")),
         PreviewApp(name: "Finder", bundleID: finder, windows: titled("Downloads", "Projects")),
@@ -185,20 +185,20 @@ private struct PreviewApp {
         case .chrome3:
             (chrome, titled(chromeTitles))
         case .terminal2:
-            (terminal, titled("lukas — -zsh — 120×40", "bettertab — swift build — 120×40"))
+            (terminal, titled("jdoe — -zsh — 120×40", "bettertab — swift build — 120×40"))
         case .notes1:
             (notes, titled("Notes"))
         case .minimized:
             (code, titled("WindowList.swift — bettertab", "README.md — dotfiles")
-                + [WindowListItem(title: "App.tsx — koala42-web", isMinimized: true)])
+                + [WindowListItem(title: "App.tsx — website", isMinimized: true)])
         case .eleven:
             (finder, titled("Downloads", "Projects", "bettertab", "Screenshots", "Desktop", "Documents",
-                          "Invoices 2026", "Design Assets", "Applications", "koala42-web", "Recents"))
+                          "Invoices 2026", "Design Assets", "Applications", "website", "Recents"))
         case .untitledAndDuplicates:
             (chrome, titled("New Tab", "New Tab", "", "Inbox (24) - Gmail"))
         case .longTitle:
             (chrome, titled("Window-level switching for the ⌘⇥ app switcher without replacing it: open questions, "
-                              + "edge cases and rollout plan · Issue #1287 · koala42/bettertab",
+                              + "edge cases and rollout plan · Issue #1287 · example/bettertab",
                           "Inbox (24) - Gmail"))
         }
     }
