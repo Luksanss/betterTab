@@ -24,17 +24,32 @@ final class AccessibilityPermission: NSObject {
         )
         check()
         logger.info("Accessibility trusted at launch: \(AppStatus.shared.isTrusted, privacy: .public)")
+        promptOnFirstLaunch()
     }
 
     /// Shows the system prompt and opens Privacy & Security → Accessibility.
     func requestAccess() {
         logger.info("Requesting Accessibility access")
-        // The string key avoids the global kAXTrustedCheckOptionPrompt, which Swift 6 rejects as
-        // not concurrency-safe.
-        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        showSystemPrompt()
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    /// A menu-bar item alone is easy to miss (the notch can hide it), so the very first launch
+    /// without the permission shows the system prompt once. After that, the menu offers it.
+    private func promptOnFirstLaunch() {
+        let key = "promptedForAccessibility"
+        guard !AppStatus.shared.isTrusted, !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        logger.info("First launch without Accessibility: showing the system prompt")
+        showSystemPrompt()
+    }
+
+    private func showSystemPrompt() {
+        // The string key avoids the global kAXTrustedCheckOptionPrompt, which Swift 6 rejects as
+        // not concurrency-safe.
+        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
     private func check() {
