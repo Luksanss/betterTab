@@ -40,7 +40,8 @@ macOS AirPlay Receiver (ControlCenter); :37701 is the claude-mem worker. The dev
    the result under Decisions already settled, with what failed.
 3. Then run experiment tests 1–3: read the switcher, list windows, and focus one without a flash.
 4. Once a build exists, record its `xcodebuild` command as the required check in `CLAUDE.md`
-   § Branches, commits and handoffs, and in `.claude/skills/handoff-update/SKILL.md` step 2.
+   § Branches, commits and handoffs. Don't edit the handoff skills in `.claude/skills/`: the
+   maintainer keeps them as installed, and repo specifics belong in `CLAUDE.md`.
 
 **Open decisions:**
 - **Route A+ or B.** Test 0 decides; nothing else does.

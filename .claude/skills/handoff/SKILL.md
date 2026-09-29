@@ -12,7 +12,7 @@ Work named by the user (may be empty): `$ARGUMENTS`
 !`f=$(ls docs/handoff.md handoff.md HANDOFF.md 2>/dev/null | head -1); echo "path: ${f:-NONE FOUND}"; echo; cat "$f" 2>/dev/null`
 
 ## Git state
-!`echo "branch: $(git branch --show-current)"; echo; echo "--- working tree ---"; git status --short; echo "(empty = clean)"; echo; echo "--- last 12 commits on dev ---"; git log --oneline -12 dev 2>/dev/null; echo; echo "--- on dev, not yet released to main ---"; git log --oneline main..dev 2>/dev/null; echo "(empty = main is up to date with dev)"; echo; echo "--- last release: main ---"; git log --oneline -1 main 2>/dev/null; echo; echo "--- local vs origin, ahead behind (as of last fetch) ---"; for b in dev main; do printf "%s: " "$b"; git rev-list --left-right --count $b...origin/$b 2>/dev/null || echo "no remote"; done; echo; echo "--- other local branches ---"; git branch --format="%(refname:short)" | grep -v -x -E "dev|main"`
+!`echo "branch: $(git branch --show-current)"; echo; echo "--- working tree ---"; git status --short; echo "(empty = clean)"; echo; echo "--- last 12 commits on main ---"; git log --oneline -12 main 2>/dev/null; echo; echo "--- local main vs origin/main (ahead behind, as of last fetch) ---"; git rev-list --left-right --count main...origin/main 2>/dev/null; echo; echo "--- unmerged local branches ---"; git branch --no-merged main 2>/dev/null; echo; echo "--- merged, deletable ---"; git branch --merged main 2>/dev/null | grep -v -E "^\*|main$"`
 
 ## What to do
 
@@ -20,16 +20,16 @@ Everything above is already loaded; do not re-run it.
 
 Work through these checks silently, then report using the template below and nothing else.
 
-This repo has one working branch. Work is committed straight to `dev`; `main` is the last
-working version and only moves when the maintainer says a version works (see `CLAUDE.md`).
-
-- **Verify the handoff against git; never restate it as fact.** Commits on `dev` it doesn't know
-  about? Anything it calls "uncommitted" that is now committed, or the reverse? Local `dev` or
-  `main` behind `origin` (you may not `fetch` — tell them to)? Paragraphs it marks as spent?
-- **Release check.** If the handoff says a version was released to `main`, is that work actually
-  in `main`? If not, say so plainly.
-- **Stray branches.** Any branch other than `dev` and `main` is unexpected here; name it.
-- **Readiness.** On `main`? Say to switch to `dev` before any edit. Uncommitted changes?
+- **Verify the handoff against git; never restate it as fact.** Branches it names still
+  exist? Anything it calls "uncommitted" or "on branch X" now merged (*merged, deletable*)?
+  Commits on `main` it does not know about? Local `main` behind `origin/main`
+  (you may not `fetch` — tell them to)? Paragraphs it marks as spent?
+- **Did the assumed merge land?** `/handoff-update` archives the spent handoff and writes the
+  new one as if the merge happened, because it normally does. Check the claim rather than the
+  archive: is the work it reports as merged actually in `origin/main`? If not, say so
+  plainly — the handoff is overstating reality and that branch still has to reach mergeable.
+  Only if an archive is genuinely missing for merged work, offer to write it; never unasked.
+- **Readiness.** On `main` (a branch is needed before any edit)? Uncommitted changes?
   Services from an earlier day still running? Open questions blocking scope?
 
 ## Name the session before you answer

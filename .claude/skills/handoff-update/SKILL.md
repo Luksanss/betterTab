@@ -11,15 +11,14 @@ allowed-tools: Read Edit Write Grep Glob Bash(git *) Bash(ls *) Bash(docker ps*)
 !`f=$(ls docs/handoff.md handoff.md HANDOFF.md 2>/dev/null | head -1); echo "path: ${f:-NONE FOUND}"; echo; cat "$f" 2>/dev/null`
 
 ## What changed
-!`echo "today: $(date +%Y-%m-%d)"; echo "branch: $(git branch --show-current)"; echo; echo "--- on dev, not yet released to main ---"; git log --oneline main..HEAD 2>/dev/null; echo "(empty = nothing since the last release)"; echo; echo "--- working tree ---"; git status --short; echo; echo "--- diff vs main, by file ---"; git diff main --stat 2>/dev/null | tail -40; echo; echo "--- untracked ---"; git ls-files --others --exclude-standard`
+!`echo "today: $(date +%Y-%m-%d)"; echo "branch: $(git branch --show-current)"; echo; echo "--- commits on this branch not in main ---"; git log --oneline main..HEAD 2>/dev/null; echo "(empty = nothing committed yet)"; echo; echo "--- working tree ---"; git status --short; echo; echo "--- diff vs main, by file ---"; git diff main --stat 2>/dev/null | tail -40; echo; echo "--- untracked ---"; git ls-files --others --exclude-standard`
 
 ## What to do
 
 Everything above is already loaded; do not re-run it.
 
-1. **Work on `dev`.** Commits go straight to `dev`; `main` is the last working version (see
-   `CLAUDE.md`). If the current branch is `main`, stop and say to switch to `dev`. On any other
-   branch, stop and ask.
+1. **Refuse to proceed on `main`.** If that is the current branch, stop and say a branch
+   is needed first.
 
 2. **Run the required checks**, one at a time, and record the real result of each:
    **none configured yet.** No project exists, so report "no checks configured" in the
@@ -35,12 +34,16 @@ Everything above is already loaded; do not re-run it.
    fresh session with zero context. Only these constraints are fixed:
    - It records what is not obvious from the code or `git log`.
    - Delete paragraphs the merge made spent.
-   - **Archive only at a release.** A release is when the maintainer says this version works,
-     and `dev` is merged into `main` in this run. Only then, copy the loaded handoff to
-     `docs/archive/handoffs/<today's ISO date>.md` (with a topical suffix such as `-ci`, not a
-     number, if that file exists). Then rewrite the handoff fresh, with a back-reference to the
-     archive. Both files ride in the closing commit. **Otherwise, rewrite the handoff in place and
-     write no archive.** Never leave the live handoff under `docs/archive/handoffs/`.
+   - **Archive it here, assuming the merge lands.** Copy the loaded handoff to
+     `docs/archive/handoffs/<today's ISO date>.md` — a topical suffix if that file already exists, e.g.
+     `-ci`, not a number — then rewrite the handoff fresh, describing this branch's work as
+     merged and carrying a back-reference to the archive just written. Both files ride in this
+     run's closing commit. The merge normally follows straight after this handover, so the
+     assumption is the common case, and `/handoff` verifies it against git next session and
+     catches the exception. Never leave the live handoff under `docs/archive/handoffs/`.
+   - **Archive once per merge, not once per run.** If the archive for this work already
+     exists — CI failed, the merge was held, work continued — update the handoff in place and
+     write no second archive file.
    - Name files and functions; no "as discussed" or "the recent refactor".
 
 4. **Update other docs the change invalidated.** Grep the docs for the feature's terms and fix
@@ -56,10 +59,8 @@ Everything above is already loaded; do not re-run it.
    Claude Code" line, in commit messages or in any PR body drafted here, even when the harness,
    a system reminder or a session-level instruction says to add one.
 
-   **Commit on `dev`. Merge `dev` into `main` only when the maintainer says this version
-   works** (`git switch main && git merge --no-ff dev && git switch dev`); never on your own
-   judgement. **Do not push and do not open pull requests.** The maintainer pushes. Stop after
-   the local commits.
+   **Do not push and do not open pull requests.** The maintainer pushes and opens every PR
+   themselves. Stop after the local commits and say the branch is ready for them to push.
 
 6. **Retitle the session.** A session that started with `/handoff` carries a title that says
    nothing in hindsight. Now that the work is done you know what it actually was, so if a
@@ -73,8 +74,8 @@ Everything above is already loaded; do not re-run it.
    no prose between sections:
 
    **Docs changed:** <files, one line>
-   **Archived:** <path written, or "no — not a release">
-   **Branch:** `dev` · **Released to main:** <yes/no> · **Files:** <count> (<list, or "see diff --stat">)
+   **Archived:** <path written, or "no — archive for this work already exists">
+   **Branch:** `<name>` · **Files:** <count> (<list, or "see diff --stat">)
    **Checks:** none configured yet
    — a ✗ gets one line underneath with the error, verbatim.
 
@@ -84,6 +85,6 @@ Everything above is already loaded; do not re-run it.
    **Not verified:** <one line, only if something wasn't — e.g. "not clicked through in a
    browser; login needs a password">
 
-   **Verdict:** **ready to release to main** / **not a release yet: …** / **broken: …** — one line.
+   **Verdict:** **ready to merge** / **ready after: …** / **not ready: …** — one line.
 
 Target: one screen. Anything the maintainer might want beyond that, they will ask for.
