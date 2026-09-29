@@ -66,7 +66,7 @@ release instead (2026-09-29, `docs/product.md`). The research still applies to r
 ⌘⇥ ─► Dock (native switcher) ─► AXProcessSwitcherList ─► SwitcherWatcher: highlighted app + icon frames
  │                                                                 │
  └─► KeyTap (session event tap) ─► Controller ◄────────────────────┘
-       sees ⌘⇥, ⌘ release,          │  Cycling: DotsOverlay draws window counts over native icons
+       sees ⌘⇥, ⌘ release,          │  Cycling: StackEdgesOverlay draws stack edges over native icons
        letters, Esc                  │  ⌘ released on an app with ≥ 2 windows: swallow it → Picking
                                      ▼
                         WindowList panel ─► pick ─► Focuser ─► the chosen window
@@ -75,12 +75,20 @@ release instead (2026-09-29, `docs/product.md`). The research still applies to r
 | Component | Job |
 |---|---|
 | `SwitcherWatcher` | On ⌘⇥, find the Dock's `AXProcessSwitcherList`. Follow its selected child and read each child's frame. Report when the list is destroyed. |
-| `WindowIndex` | When the switcher opens, read every listed app's standard windows in parallel, using AX with a 250 ms timeout. That gives the dot counts, and means the highlighted app's list is ready before ⌘ is released. |
-| `DotsOverlay` | A transparent, click-through panel above the native switcher, drawing dots under each multi-window icon at its AX frame. |
+| `WindowIndex` | When the switcher opens, read every listed app's standard windows in parallel, using AX with a 250 ms timeout. That gives the window counts, and means the highlighted app's list is ready before ⌘ is released. |
+| `StackEdgesOverlay` | A transparent, click-through panel above the native switcher. Behind each multi-window icon it draws the top edges of one or two more windows, from the icon's AX frame. |
 | `KeyTap` | A session-level `CGEvent` tap; details below. |
 | `WindowList` | The panel above the highlighted icon (design v4/v5). |
 | `Focuser` | Bring one specific window to the front and make it key. |
 | `Permissions` | Check for and request Accessibility; show its state in the menu-bar item. |
+
+**The switcher's geometry on macOS 27** (measured on 2026-09-30 from a screenshot and the AX
+frames, with five apps). The switcher is 712 × 176 pt. Each icon's AX frame is 128 pt, and the
+icon image fills it, so the visible rounded square is 103 pt (Apple's icon grid: an 824 pt body
+on a 1024 pt canvas). Icons are 6 pt apart, with 24 pt of padding around them. The Dock's
+highlight is the frame inset by 4 pt, and the app's name sits just below the frame, where the old
+dots were. The stack edges rise at most about 7 pt above the body, which keeps them inside the
+highlight. The self-test notes these frames in its `stack-edges` scenario.
 
 **`KeyTap` in detail.** In Cycling, it passes everything through, but watches for ⌘ being
 released. If the highlighted app has two or more windows, it swallows that release and moves to
@@ -165,7 +173,7 @@ WindowLens:
   lists the Spaces; `SLSCopyWindowsWithOptionsAndTags` (options 0x7) lists their windows; and the
   `SLSWindowQueryWindows` iterator gives each window's pid, parent, level, tags and attributes.
   yabai's filter (MIT, `src/space.c`) keeps exactly the real windows, dropping the toolbars,
-  title-bar strips and background tabs. It takes about 1 ms for every app, so the dots come from it.
+  title-bar strips and background tabs. It takes about 1 ms for every app, so the window counts come from it.
 - **Titles:** only through AX. Without Screen Recording the window server returns empty titles.
   Per app: `kAXWindows` plus `kAXMainWindow` and `kAXFocusedWindow`, which reach the last main window
   on any Space. For windows still unresolved, a time-boxed `_AXUIElementCreateWithRemoteToken` scan

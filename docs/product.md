@@ -48,8 +48,8 @@ list itself is the easy part.
 
 ## The interaction (decided 2026-09-29)
 
-Press ⌘⇥ as usual. Apps with more than one window show window-count dots under their icon. Release
-on a single-window app and it switches natively. Release on an app with two or more windows and
+Press ⌘⇥ as usual. Apps with more than one window show the edges of more windows stacked behind
+their icon. Release on a single-window app and it switches natively. Release on an app with two or more windows and
 nothing switches yet: the switcher stays, and a list of that app's windows opens above its icon,
 each with a home-row letter (A S D …). Press a letter to go to that window, or Esc to stay where
 you were. Exact behaviour is in `docs/spec.md`.
@@ -57,8 +57,8 @@ you were. Exact behaviour is in `docs/spec.md`.
 **Why pick after release, not while holding ⌘.** Holding was considered: the window row would
 show while ⌘ is still held, and releasing would confirm the most recent window. The maintainer
 chose picking after release. The list only appears for apps with more than one window, so
-choosing is an expected step, not a surprise. The dots show beforehand which apps will ask. The
-accepted cost is one key press (A) even when the most recent window is the one you want.
+choosing is an expected step, not a surprise. The stack edges show beforehand which apps will ask.
+The accepted cost is one key press (A) even when the most recent window is the one you want.
 
 ## Scope
 

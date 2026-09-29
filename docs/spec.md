@@ -4,6 +4,8 @@ This file is the source of truth for what BetterTab does. `docs/product.md` expl
 `docs/architecture.md` explains how. When they disagree with this file about behaviour, this
 file wins. Rewritten 2026-09-29 around the maintainer's flow: pick the window after releasing ⌘.
 The look comes from the Claude design (v4 reviewed; v5 brief in `docs/design-brief-v5.md`).
+Changed 2026-09-30: stack edges replace the window-count dots, the first launch shows the
+Accessibility prompt, the menu shows the version, and every push to `main` publishes a release.
 
 ## In one sentence
 
@@ -26,8 +28,10 @@ These decide every case this spec doesn't cover.
 ## The flow
 
 1. **Cycle.** Hold ⌘ and press Tab: the macOS switcher, as always. Apps with two or more windows
-   show **window-count dots** under their icon (one dot per window, at most 4). That way you
-   know before letting go which apps will ask you to pick.
+   show **stack edges**: the top edges of more windows peeking out behind their icon, one edge
+   for two windows and two for three or more. That way you know before letting go which apps will
+   ask you to pick. (Dots under the icon were tried first, but they read as the Dock's "running"
+   dots and sat on the app name.)
 2. **Release on a single-window app.** The switch happens natively. BetterTab stays out of it.
 3. **Release on an app with two or more windows.** The switch does **not** happen yet. The
    switcher stays on screen, and the **window list** opens directly above the highlighted icon.
@@ -97,7 +101,7 @@ nothing is picked, and the click lands on whatever is under the pointer.
 ## States
 
 ```
-Idle ──⌘⇥──► Cycling (native switcher; dots drawn)
+Idle ──⌘⇥──► Cycling (native switcher; stack edges drawn)
                 │ ⌘ released, highlighted app has ≤ 1 window ───────────► native switch ─► Idle
                 │ ⌘ released, highlighted app has ≥ 2 windows
                 ▼
@@ -111,13 +115,15 @@ When idle, BetterTab uses no CPU. It has no timers and does no polling, only the
 
 ## The menu-bar item
 
-This is the only UI besides the dots and the list. It shows a template icon, and the menu has:
+This is the only UI besides the stack edges and the list. It shows a template icon, and the menu
+has:
 
 - **A status line:** "Active", "Needs Accessibility permission", or "Can't find the ⌘⇥
   switcher". The last one appears when BetterTab has failed to find it three times in a row.
 - **Grant Accessibility…**, shown only when the permission is missing. It triggers the system
   prompt and opens System Settings at Privacy & Security → Accessibility.
 - **Launch at Login**, a checkmark toggle using `SMAppService`.
+- **The version,** greyed out, such as "Version 0.1.87". Debug builds add "(Debug)".
 - **Quit BetterTab.**
 
 There's no Dock icon and no windows. Quit is the off switch.
@@ -126,8 +132,10 @@ There's no Dock icon and no windows. Quit is the off switch.
 
 - **Accessibility is the only permission.** The key tap doesn't need Input Monitoring (confirmed
   live on 2026-09-29). On macOS 27 the pane is titled "Device Control and Data Access".
-- **First launch without the permission:** only the menu-bar item appears, in its
-  needs-permission state, and ⌘⇥ is plain native. There's no onboarding window.
+- **First launch without the permission:** the system's Accessibility prompt appears once, because
+  a menu-bar item alone is easy to miss (the notch can hide it). After that only the menu offers
+  it. The menu-bar item shows its needs-permission state, and ⌘⇥ is plain native. There's no
+  onboarding window.
 - **When the permission is granted,** BetterTab notices within 2 s, without a restart. **When
   it's revoked,** BetterTab goes back to the needs-permission state. ⌘⇥ keeps working natively
   throughout.
@@ -135,15 +143,16 @@ There's no Dock icon and no windows. Quit is the off switch.
 ## Privacy
 
 BetterTab has no network code, analytics or crash reporting, and saves nothing to disk apart from
-the Launch at Login state. Window titles are held in memory only while the switcher is open, and
-are never logged. Release builds log counts and states only.
+the Launch at Login state and whether the first-launch prompt has been shown. Window titles are
+held in memory only while the switcher is open, and are never logged. Release builds log counts
+and states only.
 
 ## Performance targets
 
 | What | Target |
 |---|---|
 | List visible after releasing ⌘ | within one frame; window lists are read while the app is highlighted, before you let go |
-| Dots drawn after the switcher appears | under 100 ms. All apps are read in parallel, and AX calls time out at 250 ms each, so a hung app just gets no dots |
+| Stack edges drawn after the switcher appears | under 100 ms. All apps are read in parallel, and AX calls time out at 250 ms each, so a hung app just gets no edges |
 | The chosen window in front after a key press | under 100 ms on the current Space; another Space adds macOS's slide |
 | Idle CPU | 0% |
 | Memory | under 30 MB |
@@ -156,7 +165,7 @@ These are hard-coded, with no settings UI.
 |---|---|
 | Letters | A S D F G H J K L (physical home-row keys) |
 | Maximum windows listed | 9 |
-| Maximum dots per icon | 4 |
+| Stack edges per icon | at most 2 |
 | AX messaging timeout | 250 ms |
 | Cancel after no input | 15 s |
 | Permission re-check while missing | every 2 s |
@@ -170,7 +179,8 @@ These aren't "later"; they're **no**, unless daily use proves otherwise:
 - a separate shortcut, or a second mode;
 - a settings window, and per-app exclusion lists;
 - Dock previews;
-- distribution: signing for other people, notarization, automatic updates.
+- notarization and automatic updates. Releases are zips on GitHub (`docs/releasing.md`); users
+  click Open Anyway once, and download new versions themselves.
 
 ## Acceptance tests
 
@@ -178,7 +188,8 @@ Run these by hand on macOS 27 before calling the MVP done. "Chrome ×3" means th
 on the current Space.
 
 1. **Single window.** ⌘⇥ to Notes (one window) and release: a native switch, with no list.
-2. **Dots.** While cycling, Chrome ×3 shows 3 dots, Terminal ×2 shows 2, and Notes shows none.
+2. **Stack edges.** While cycling, Chrome ×3 shows two edges behind its icon, Terminal ×2 shows
+   one, and Notes shows none. The edges stay inside the switcher's highlight.
 3. **The list opens.** Release on Chrome ×3. The switcher stays, the list shows A S D above
    Chrome with A highlighted, and the previous app is still in front.
 4. **Pick.** Press S. Chrome's second window is in front and key, and typing goes into it. Note
@@ -202,10 +213,13 @@ on the current Space.
 15. **Timeout.** Leave the list open for 15 s: it cancels.
 16. **Quick tap.** Tap ⌘⇥ quickly onto Chrome ×2: the list opens, or the switch stays native if the
     experiment ruled that out.
-17. **Second display.** With the switcher on the other display, the dots and list appear there.
+17. **Second display.** With the switcher on the other display, the stack edges and list appear
+    there.
 18. **Permission.** Revoke Accessibility: the status says so and ⌘⇥ is native. Grant it: active
-    again within 2 s.
+    again within 2 s. On the first launch without it, the system prompt appears once, and not on
+    later launches.
 19. **Idle.** With the switcher closed for a minute, Activity Monitor shows 0% CPU.
-20. **Other Spaces.** With one Chrome window on Desktop 1 and two full-screen, Chrome shows 3 dots
-    and the list shows all three. Picking a full-screen one switches to its Space, and typing goes
-    into it.
+20. **Other Spaces.** With one Chrome window on Desktop 1 and two full-screen, Chrome shows two
+    stack edges and the list shows all three. Picking a full-screen one switches to its Space, and
+    typing goes into it.
+21. **Version.** The menu shows "Version" and the release's version, such as 0.1.87.

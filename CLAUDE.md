@@ -2,8 +2,8 @@
 
 A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
 switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-The whole flow is built, including windows on other Spaces, and worked in its first live run; the
-self-test hasn't run yet. See `docs/handoff.md` for where testing stands.
+The whole flow is built, including windows on other Spaces, and the self-test passes. See
+`docs/handoff.md` for where testing stands.
 
 ## Start here
 
@@ -21,7 +21,7 @@ One developer, one user, so keep it simple.
   Commits and no AI attribution.
 - **`main` is the last working version.** It moves only when the maintainer says a version works.
   Then merge `dev` into `main` (`git switch main && git merge --no-ff dev`). Never do this on your
-  own judgement.
+  own judgement. Every push to `main` publishes a GitHub Release (`docs/releasing.md`).
 - **Never commit on `main` directly.**
 - **Archive a handoff only at a release,** meaning a merge of `dev` into `main`: copy
   `docs/handoff.md` to `docs/archive/handoffs/<ISO date>.md`, adding a topical suffix if the date

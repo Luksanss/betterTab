@@ -1,11 +1,22 @@
 # Handoff
 
-Updated on 2026-09-29, after release 1. `dev` was merged into `main` through GitHub pull request
-#1 (`Luksanss/betterTab`) at 23:01, so `main` is now the whole app as it first worked live. The
-handoff as of that release, with the full story of the build, is archived at
-`docs/archive/handoffs/2026-09-29.md`. The session after the merge checked whether the repo is
-safe to make public, rewrote `README.md` for outside readers, and replaced the sample window
-titles in `BetterTab/Debug/DesignPreview.swift` with neutral ones. The self-test still hasn't run.
+Updated on 2026-09-30. Release 2 happened first: GitHub pull request #2 (`Luksanss/betterTab`)
+merged `dev` into `main` at 23:10 on 2026-09-29, carrying the README rewrite and the neutral
+sample titles. The handoff as of that release is archived at
+`docs/archive/handoffs/2026-09-29-public-repo.md`. The repo is now public.
+
+This session ran while the maintainer was away and had said the Mac was free for live tests. It
+built everything the maintainer asked for after a brainstorm:
+- **stack edges** in place of the window-count dots;
+- the **Accessibility prompt once on first launch**, and the **version in the menu**;
+- **automatic GitHub releases** on every push to `main`;
+- an **app icon**;
+- a **shorter README**.
+
+It also ran the self-test for the first time: 13 of 13 pass, with `--long`. For this session
+only, the maintainer allowed pushing `dev` and opening a pull request to `main`, so `dev` is pushed
+and a pull request is open. The standing rule is unchanged: agents never push or open pull
+requests.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -13,7 +24,7 @@ the maintainer says a version works. At that point it's copied to
 `docs/archive/handoffs/<ISO date>.md` in the same commit, with a topical suffix such as `-ci` (not
 a number) if that date is taken. If the merge goes through a GitHub pull request, the archive
 can't be in the merge commit, so the next `/handoff-update` on `dev` writes it; that's what
-happened for release 1. This file is then started fresh. Never leave the live handoff under
+happened for releases 1 and 2. This file is then started fresh. Never leave the live handoff under
 `docs/archive/handoffs/`; readers are told to treat that directory as historical only.
 
 This document records what is **not** obvious from the code or `git log`: decisions and the
@@ -22,41 +33,68 @@ ticket tracker; the next action below is the backlog.
 
 ## Working copy state
 
-- **`main`** is `4dc165a`, the merge of pull request #1: release 1. `origin/main` matches.
-- **`dev`** was fast-forwarded to `main` after the merge, then got this session's commits: the
-  neutral sample titles, the README and this handoff. The maintainer pushed the first two
-  (`origin/dev` is `dd3fa8e`); this handoff's commit is **not pushed**. After a merge on GitHub,
-  fast-forward `dev` (`git merge --ff-only main` while on `dev`) so it doesn't fall behind `main`.
-- **GitHub:** `Luksanss/betterTab` is **private** and has no LICENSE.
-- **Build:** the `CLAUDE.md` check passes. Both targets are signed with the maintainer's Apple
-  Development certificate (Personal Team `5KDU5HYH35`), so the Accessibility grant survives
-  rebuilds. The Debug app at `build/DerivedData/Build/Products/Debug/BetterTab.app` was rebuilt
-  this session; its grant wasn't re-checked.
-- **Dev machine:** macOS 27.0.1 (26A434) on Apple Silicon, Xcode 27.0, Swift 6.4. At the end of
-  this session, :5000/:7000 were AirPlay (ControlCenter) and :37701 the claude-mem worker.
+- **`main`** is `d7824ee`, the merge of pull request #2: release 2. `origin/main` matches.
+- **`dev`** has this session's commits on top of `26aaa3a`, and is pushed. A pull request from
+  `dev` to `main` is open and waiting for the maintainer. `dev` doesn't contain the merge commit
+  `d7824ee`, but its tree is the same as `dd3fa8e`, which `dev` has, so the pull request merges
+  cleanly.
+- **GitHub:** `Luksanss/betterTab` is **public**. It went public with its history unchanged, so the
+  author email and the old sample titles are visible, and there's **no LICENSE**. The signing
+  secrets aren't set (see `docs/releasing.md`).
+- **Build:** the `CLAUDE.md` check passes. The only `warning:` line comes from
+  `appintentsmetadataprocessor` ("Metadata extraction skipped"); it's a tool message, not our code,
+  and it was there before this session. The Debug app was rebuilt and relaunched at the end of the
+  session.
+- **Left on screen from testing:** three Finder windows on empty folders and two TextEdit
+  documents (`sink.txt`, `sink2.txt`), all in the session's scratchpad under `/private/tmp`. Closing
+  them is safe. The agent shell can't close them itself, because Apple Events to Finder or
+  TextEdit would ask for Automation permission.
+- **Dev machine:** macOS 27.0.1 (26A434) on Apple Silicon, Xcode 27.0, Swift 6.4.
 
 ## Next action
 
-1. **Run the self-test** while nobody is using the Mac. The command is in `CLAUDE.md`. Quit
-   BetterTab first, and keep the screen from locking with `caffeinate -u`. Iterate on the report
-   (`--long` adds the 15 s timeout).
-2. **Fix the Space switch in `BetterTab/Focus/Focuser.swift`.** Every cross-Space pick in the live
-   run logged `space didn't` after its 300 ms poll and fell back to `activate`, taking about 336 ms
-   before the fallback even started. The maintainer still saw the right window. Find out whether
-   the slide just takes longer than 300 ms, or whether only `activate` moves the Space, and drop
-   the fallback's extra delay.
-3. **The maintainer runs acceptance tests 1–20 by hand** (`docs/spec.md`), especially 4 (flash) and
-   20 (other Spaces).
-4. **Still owed from test 0:** 0a (hold ≥ 15 s), 0e (Esc cancels on a non-front app), 0g (`kill -9`
-   recovery). These are acceptance tests 15, 7 and 14.
-5. **Before the repo is made public,** the maintainer decides two things (see Findings § The
-   public-repo check): whether to rewrite history, and which licence, if any. Changing the
-   visibility on GitHub is the maintainer's job.
-6. **When the maintainer says a version works,** merge `dev` into `main` and archive this handoff.
-   `dev` already carries the README and sample-title commits that aren't on `main`.
+1. **The maintainer reviews and merges the open pull request** when this version works. That push
+   to `main` is the first automated release. Check the run under Actions → Release: it's the first
+   time the workflow runs anywhere.
+2. **Add the two signing secrets** (`docs/releasing.md` § Signing with your certificate), ideally
+   before that merge. Without them the release is signed ad-hoc, and anyone who installs it loses
+   the Accessibility grant with every update.
+3. **Look at the stack edges in daily use.** Only dark mode was checked on the real switcher.
+   Light mode was only rendered offscreen over a stand-in background. A switcher crowded enough to
+   shrink its icons, and a second display, are unchecked.
+4. **Fix the Space switch in `BetterTab/Focus/Focuser.swift`.** Every cross-Space pick in the first
+   live run logged `space didn't` after its 300 ms poll and fell back to `activate`, which took
+   about 336 ms before the fallback even started. The self-test runs didn't cover this, because no
+   multi-window app had a window on another Space (see Findings). Set one up (a Finder or TextEdit
+   window made full-screen) and run the self-test with `--pause 3`.
+5. **The maintainer runs acceptance tests 1–21 by hand** (`docs/spec.md`), especially 4 (flash),
+   14 (`kill -9` recovery), 18 (the first-launch prompt) and 20 (other Spaces).
+6. **Still to discuss, from the brainstorm** (the maintainer said "we will discuss later"):
+   - making a quick ⌘⇥ flip-back always native, rather than depending on whether Accessibility
+     answered in time;
+   - marking list rows whose window is on another Space.
+7. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
 
 ## Decisions already settled
 
+- **Stack edges replace the window-count dots** (maintainer, 2026-09-29).
+  - The maintainer found the dots too close to the Dock's "running" dots. They picked "stacked
+    edges" from four mocks: dots, a count badge, stacked edges and a keycap chip.
+  - The agent chose the top-centred stack over the diagonal one from the mock, after prototyping
+    both on a screenshot of the real switcher. It's symmetrical and stays inside the Dock's
+    highlight. The diagonal one looked like a Copy icon.
+  - One edge for two windows, two for three or more. The exact count is the list's job.
+- **Releases: the free route, automatic on every push to `main`** (maintainer, 2026-09-29). There's
+  no Developer ID and no notarization; users click Open Anyway once, and the maintainer considers
+  that normal on macOS. There are no automatic updates, because the app has no network code.
+  - This replaces "personal use only".
+  - The version is `MARKETING_VERSION` plus the commit count, so `0.1.87` means 87 commits.
+- **The first launch without Accessibility shows the system prompt once,** and **the menu shows the
+  version** (maintainer, 2026-09-29, from the brainstorm). The flag is `promptedForAccessibility`
+  in `UserDefaults`, so the spec's privacy line now names two saved values.
+- **The app icon is the menu-bar glyph scaled up:** white windows on indigo, as an Icon Composer
+  `.icon` (the agent's pick of three concepts; the maintainer delegated the choice). Its source is
+  `design/icon/make-icon.swift`; don't edit `BetterTab/AppIcon.icon` by hand.
 - **Route A+: hold macOS's own switcher open** (test 0, 2026-09-29). The hold works with the session
   tap; the evidence is in `docs/architecture.md` § Test 0 results. Native ⌘⇥ is never turned off.
 - **A plain Xcode project with synchronized folders** (maintainer, 2026-09-29), with a throwaway
@@ -67,7 +105,8 @@ ticket tracker; the next action below is the backlog.
   SkyLight lists the windows with no permission, and AX supplies titles. Background native tabs
   still don't count.
 - **Sign with the maintainer's Apple Development certificate** (maintainer, 2026-09-29), not ad hoc.
-  An ad-hoc build's designated requirement is its cdhash, so every rebuild lost the grant.
+  An ad-hoc build's designated requirement is its cdhash, so every rebuild lost the grant. The
+  same reasoning is why releases should be signed through the secrets.
 - **The list ignores the mouse, and a click ends the switch** (test 0: any click, even on our own
   panel, closes the native switcher).
 - **⌘ pressed and released while the list is open cancels** (agent's call). It doubles as the
@@ -78,16 +117,13 @@ ticket tracker; the next action below is the backlog.
   - Releasing on a multi-window app doesn't switch. The switcher stays, and a window list opens
     above the icon.
   - Single-window apps switch natively.
-  - Window-count dots under the icons show beforehand which apps will ask.
+  - The stack edges show beforehand which apps will ask.
   - The alternative was picking while ⌘ is held, with release confirming the most recent window.
     The maintainer rejected it: the list only appears for multi-window apps, so choosing is an
     expected step. The accepted cost is one key press (A) even for the most recent window.
   - Don't reopen this without new evidence from daily use.
 - **Letters, not numbers:** A S D F G H J K L, the physical home-row keys, restarting at A for
   each app (maintainer's v4 design, 2026-09-29). Labels follow the keyboard layout.
-- **Personal use only, for now** (maintainer, 2026-09-29). The App Store is ruled out anyway,
-  because its sandbox forbids the Accessibility and private APIs this app needs. No Developer ID
-  signing, notarization or update channel until that changes.
 - **DockDoor isn't an option, and being minimal is the point** (maintainer, 2026-09-29).
   DockDoor already puts a window picker on the native ⌘⇥, but the maintainer considers it far too
   bloated to use. BetterTab exists to do this one thing and nothing else. Treat every feature
@@ -95,32 +131,63 @@ ticket tracker; the next action below is the backlog.
 - **One working branch** (maintainer, 2026-09-29).
   - Commit straight to `dev`, with no feature branches. It's one developer and one user.
   - `main` is the last working version. Merge `dev` into it only when the maintainer says a
-    version works. The maintainer may do that through a GitHub pull request, as for release 1.
-  - Agents never push or open pull requests; the maintainer does both.
+    version works. The maintainer may do that through a GitHub pull request, as for releases 1
+    and 2. Every push to `main` now publishes a release.
+  - Agents never push or open pull requests; the maintainer does both. The 2026-09-30 session had
+    a one-time exception.
 - **No ticket tracker.**
 
 ## Findings worth keeping
 
-**From the public-repo check (2026-09-29, after release 1):**
-- **There are no secrets anywhere in history.** Every blob in every commit on every branch was
-  scanned. There are no key, certificate or provisioning-profile files, no `.env`, no PEM blocks,
-  no GitHub, Anthropic, AWS, Google or Slack token patterns, and no binary files at all. The Team
-  ID in `project.pbxproj` isn't a secret, since every app it signs carries it.
-- **What a public history would still show:**
-  - the author email on every commit, which is the maintainer's personal address;
-  - the sample titles in `DesignPreview.swift` before `f2667c4`, which named the maintainer's
-    employer, its GitHub organisation and the maintainer's username.
+**From the 2026-09-30 session, all on this Mac:**
+- **The self-test passes: 13 of 13 with `--long`.**
+  - The switcher was up 150–180 ms after ⌘⇥.
+  - The list opened 10–19 ms after the release.
+  - Picks took 30–95 ms, and the timeout fired at 15.2 s.
+  - The targets were TextEdit ×2 (home), Finder ×3 (multi) and Claude ×1 (single). No window was on
+    another Space, so cross-Space picking wasn't exercised.
+- **The self-test needs a multi-window app on screen,** or it skips almost everything. That's how
+  the first run went: the maintainer's Chrome had one real window, full-screen, and Notes wasn't
+  running. Safe targets:
+  - scratch TextEdit documents, so a stray letter lands in a scratch file;
+  - Finder windows on empty folders, so Return has nothing to rename.
 
-  The current tree has neither. Removing them from history means rewriting `main` and `dev`,
-  both already pushed.
-- **There's no LICENSE,** so a public repo would be all rights reserved. The yabai MIT notices are
-  in `BetterTab/Switcher/SkyLightWindows.swift` and `BetterTab/Focus/MakeKeyWindow.swift`. AltTab
-  and DockDoor appear only as issue numbers and file references. That was checked with a grep,
-  not a line-by-line comparison.
-- **`README.md` is written for outside readers now.** It covers the keys, requirements, building
-  with your own signing team, how it works, privacy and credits. Its advice to change the bundle
-  ID when Xcode says it's taken comes from how Xcode generally behaves; nobody has tried a build
-  from a second account.
+  Open them with `open` and bring the home app to the front before launching the test with
+  `open -g`.
+- **Coming back from a full-screen Space, the Dock shows no switcher until the slide ends.** The
+  frontmost app changes before the slide starts. The stack-edges scenario, which follows
+  single-native, failed on every run until `SelfTest.restoreHome` waited 1.2 s whenever home's
+  windows weren't on the current Space.
+- **The native switcher's geometry** is in `docs/architecture.md` § How route A+ works. In short:
+  - AX icon frames are 128 pt, and the icon image fills them;
+  - the visible rounded square is 103 pt;
+  - the highlight is the frame inset by 4 pt;
+  - the app's name sits just under the frame, which is where the dots were drawn.
+
+  The self-test's `stack-edges` scenario notes the frames.
+- **Screenshots from the agent shell work; keys don't.** The shell (the Claude app) has Screen
+  Recording but not Accessibility, so every key has to come from BetterTab's self-test. The
+  capture method:
+  - run with `--pause <s>`;
+  - poll the report's `checkpoint` field;
+  - `screencapture -x -m` when it changes.
+
+  Opening BetterTab's own menu for a screenshot took a temporary patch that calls `performClick`
+  on the status button. The patch wasn't committed.
+- **GitHub's only hosted image with Xcode 27 is `xcode-27`** (macOS 27, arm64, a public preview
+  since 2026-07-16, with macOS 27 as its base since 2026-09-16).
+  - `macos-latest` and `macos-26` only have Xcode 26.
+  - The workflow pins `/Applications/Xcode_27.0.app` and fails unless `xcodebuild` reports
+    Xcode 27.
+  - A public preview can queue, and the label may be renamed at GA
+    (`actions/runner-images#14404`).
+- **The workflow's release script was tested locally in both modes.** It produced
+  `CFBundleShortVersionString` 0.1.99 and `CFBundleVersion` 99, the icon (`Assets.car` and
+  `AppIcon.icns`), and a signature that verifies. The workflow itself hasn't run, and neither has
+  its keychain import, because no secrets are set.
+- **A hand-written `.icon` compiles.** actool turns it into `Assets.car` plus `AppIcon.icns`.
+  Icon Composer's command-line `ictool` renders it headless in every appearance; the command is in
+  `design/icon/README.md`.
 
 **From the build session (2026-09-29), all on this Mac:**
 - **The live run at 22:57** (logs, subsystem `com.luksanss.BetterTab`):
@@ -128,14 +195,14 @@ ticket tracker; the next action below is the backlog.
   - Chrome's list showed 3 windows, 2 full-screen, with none untitled and none missing an AX
     element, so titles resolve across Spaces;
   - focusing reported make-key `true` and raise `ok`, but `space didn't` switch in 300 ms (see Next
-    action 2).
+    action 4).
 - **Accessibility alone is enough for the key tap.** BetterTab never asks for Input Monitoring, and
   its tap ran and swallowed releases with only Accessibility granted. On macOS 27 that pane is
   titled "Device Control and Data Access".
 - **Test 0:** the hold, mouse moves, swallowed letters, the synthetic release finishing a switch, ⌘
   not stuck, and ⌘⇥ again all pass. See `docs/architecture.md` § Test 0 results.
 - **The native switcher,** as found through AX: the Dock-owned `AXProcessSwitcherList` is found about
-  220 ms after ⌘⇥; items are matched to pids by name (the Dock gives no `AXURL`). Its window is
+  150–220 ms after ⌘⇥; items are matched to pids by name (the Dock gives no `AXURL`). Its window is
   full-screen at layer 20.
 - **Windows on other Spaces:** see `docs/architecture.md` § Windows on every Space. The expensive
   facts:
@@ -150,9 +217,13 @@ ticket tracker; the next action below is the backlog.
   - a `.app` launched with `open` runs under its own TCC identity, which is useful for probing what
     works with no permission.
 - **The screen locks after 20 minutes idle,** and a locked screen stops live tests (the self-test
-  refuses to run then). For long unattended runs, keep the Mac awake with `caffeinate -u`.
+  refuses to run then). For long unattended runs, keep the Mac awake with `caffeinate -d -i -u`.
 - **macOS 27 may not draw `NSMenuItem.image`,** so the status line draws its own dot. This came from
   an in-process capture the maintainer's typing may have disturbed; the code works either way.
+
+**From the public-repo check (2026-09-29):** there are no secrets anywhere in history, and no
+binary files. The Team ID in `project.pbxproj` isn't a secret. The full check is in
+`docs/archive/handoffs/2026-09-29-public-repo.md`.
 
 **From the research before the build:**
 
@@ -203,21 +274,24 @@ detail and API table are in `docs/architecture.md`.
 
 ## Known gaps
 
-- **The self-test has never run.** Whether the Dock reacts to synthetic ⌘⇥ is its first question.
+- **The release workflow has never run,** and its keychain import is untested.
+- **The first-launch prompt is unverified live.** This Mac already has the grant, and revoking it
+  is the maintainer's call. Acceptance test 18 covers it.
+- **Stack edges are unverified on the real switcher in light mode,** and with icons the switcher has
+  shrunk. The geometry is proportional to the frame, so it should scale.
 - **Unverified on macOS 27:**
   - how long the Space slide takes, and whether steps 4–6 of the focus sequence move the Space
     without `activate`;
   - whether another window of the app flashes before the picked one;
   - whether a lone make-key mouse down leaves an app thinking the button is held;
   - tag bit 60 for minimized windows.
-- **Nobody else has built it.** The README's build steps have only been followed on this Mac, with
-  the maintainer's team.
-- **No CI.** The build check is run by hand.
+- **Nobody else has built or installed it yet.**
+- **The build check is manual.** The only workflow is the release.
 
 ## Safety constraints
 
-Nothing is deployed anywhere. The risk is to the maintainer's own Mac: the app under development
-changes system state on the machine it runs on.
+Nothing is deployed anywhere except the release zips. The risk is to the maintainer's own Mac: the
+app under development changes system state on the machine it runs on.
 
 - **Route A+: never leave a ⌘ release swallowed.** Swallowing the ⌘ release holds the Dock's
   switcher open, and apps may believe ⌘ is still down. Every way out of Picking must post a
