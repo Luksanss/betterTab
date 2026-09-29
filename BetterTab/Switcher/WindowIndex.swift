@@ -261,9 +261,13 @@ nonisolated private final class WindowWatch: AXObserverWorker {
         if created != .success {
             windowsLog.error("window-created notification not registered (\(created.rawValue, privacy: .public))")
         }
-        // The caller already has the windows; this read only finds which ones to observe.
-        switch WindowReader.read(pid, isWanted: { !thread.isStopRequested }) {
-        case .windows(let raw): register(raw.map(\.element))
+        // This read finds which windows to observe. It's delivered too, because the caller's
+        // windows were read when the switcher opened, and the app may have lost some since.
+        let read = WindowReader.read(pid, isWanted: { !thread.isStopRequested })
+        switch read {
+        case .windows(let raw):
+            register(raw.map(\.element))
+            deliver(read)
         case .gone:
             deliver(.gone)
             thread.stop()
