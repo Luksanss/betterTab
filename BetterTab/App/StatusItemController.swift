@@ -137,6 +137,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func runSelfTestItem() {
+        // It presses keys system-wide for a couple of minutes, so a stray click mustn't start it.
+        let alert = NSAlert()
+        alert.messageText = "Run the self-test?"
+        alert.informativeText = """
+            For about two minutes BetterTab presses ⌘⇥, letters and Esc itself and switches \
+            between windows and Spaces. Don't touch the keyboard or mouse while it runs; a click \
+            stops it. The report goes to ~/Library/Logs/BetterTab/self-test.json.
+            """
+        alert.addButton(withTitle: "Run")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
         runSelfTest?()
     }
     #endif

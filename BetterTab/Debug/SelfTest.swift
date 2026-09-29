@@ -55,6 +55,8 @@ final class SelfTest {
     var sawNonIdlePhase = false
     var sawDots = false
     private var clickSeen = false
+    /// Set while `clean` runs, so no stop can cut it off between a ⌘ down and its ⌘ up.
+    private var cleaning = false
     /// When the last release that opened a list was posted.
     var lastReleaseAt: ContinuousClock.Instant?
 
@@ -102,6 +104,7 @@ final class SelfTest {
     }
 
     private func prepare() async throws {
+        try checkScreen(before: "anything was run")
         guard try await waitFor(5, every: 0.1, nil, { AppStatus.shared.state == .active }) != nil else {
             if AppStatus.shared.state == .needsPermission {
                 throw Stop.run(result: "no Accessibility permission", finding: "BetterTab isn't trusted for Accessibility, so nothing was run.")
@@ -225,7 +228,8 @@ final class SelfTest {
             if let actions = try? await clean(nil), !actions.isEmpty {
                 recorder.update { $0.notes.append("final cleanup: \(actions.joined(separator: ", "))") }
             }
-            if let origin, !origin.isTerminated, frontPid != origin.processIdentifier {
+            // Restoring can fall back to a ⌘⇥, which mustn't reach a lock screen.
+            if let origin, !origin.isTerminated, frontPid != origin.processIdentifier, Self.screenLockReason() == nil {
                 let restored = (try? await bringToFront(origin, nil)) ?? false
                 recorder.update { $0.notes.append(restored ? "origin app restored" : "couldn't bring the origin app back to the front") }
             }
@@ -259,6 +263,7 @@ final class SelfTest {
         } else {
             do {
                 do {
+                    try checkScreen(before: "scenario \(name)")
                     try await body(run)
                 } catch Stop.scenarioTimeout {
                     run.fail("timed out after \(Int(timeout)) s")
@@ -302,16 +307,49 @@ final class SelfTest {
 
     // MARK: Waiting
 
-    /// Throws when the watchdog has fired, someone clicked, or the scenario is out of time.
+    /// Throws when the watchdog has fired, the screen is locked, someone clicked, or the scenario
+    /// is out of time. During `clean` only the watchdog and the scenario's time can stop it.
     func checkStop(_ run: ScenarioRun?) throws {
         if watchdog?.hasFired == true { throw Stop.run(result: "watchdog", finding: "The watchdog ended the run.") }
+        if !cleaning { try checkScreen(before: "the next key") }
         let elapsed = Self.seconds(since: startedAt)
-        // Once only, so the cleanup after it can still wait for things to settle.
-        if !clickSeen, elapsed > 0.5, SelfTestKeys.secondsSinceMouse(clicks: true) < elapsed - 0.1 {
+        // Once only, so the cleanup after it can still wait for things to settle; a click during
+        // `clean` is reported at the next check after it.
+        if !cleaning, !clickSeen, elapsed > 0.5, SelfTestKeys.secondsSinceMouse(clicks: true) < elapsed - 0.1 {
             clickSeen = true
             throw Stop.run(result: "aborted", finding: "A mouse click during the run: someone is using the Mac, and a click closes the switcher.")
         }
         if let run, ContinuousClock.now > run.deadline { throw Stop.scenarioTimeout }
+    }
+
+    /// Synthetic keys would go to the lock screen or the screen saver, so the run stops.
+    func checkScreen(before step: String) throws {
+        guard let reason = Self.screenLockReason() else { return }
+        selfTestLog.error("self-test stopped before \(step, privacy: .public): \(reason, privacy: .public)")
+        throw Stop.run(result: "screen locked", finding: """
+            \(reason.prefix(1).uppercased() + reason.dropFirst()), so the run stopped before \(step): synthetic keys \
+            would have gone to the lock screen.
+            """)
+    }
+
+    /// Why keys mustn't be posted now, or nil: the screen is locked, the screen saver is running,
+    /// or this session isn't the one on the console.
+    static func screenLockReason() -> String? {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+            return "there's no window-server session"
+        }
+        if (session["CGSSessionScreenIsLocked"] as? Bool) == true { return "the screen is locked" }
+        if (session["kCGSSessionOnConsoleKey"] as? Bool) == false { return "this session isn't on the console" }
+        let lockApps = ["com.apple.loginwindow", "com.apple.ScreenSaver.Engine"]
+        if !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.ScreenSaver.Engine").isEmpty {
+            return "the screen saver is running"
+        }
+        if let front = NSWorkspace.shared.frontmostApplication,
+           lockApps.contains(front.bundleIdentifier ?? "")
+            || ["loginwindow", "ScreenSaverEngine"].contains(front.executableURL?.lastPathComponent ?? "") {
+            return "\(front.executableURL?.lastPathComponent ?? "loginwindow") is in front"
+        }
+        return nil
     }
 
     func sleep(_ seconds: Double, _ run: ScenarioRun?) async throws {
@@ -416,7 +454,8 @@ final class SelfTest {
         if try await waitFor(1, nil, { self.frontPid == pid }) != nil { return true }
         app.activate(options: [.activateAllWindows])
         if try await waitFor(0.7, nil, { self.frontPid == pid }) != nil { return true }
-        guard !keys.isCommandHeld, await switcher() == nil, phase == "idle" else { return false }
+        guard !keys.isCommandHeld, await switcher() == nil, phase == "idle", Self.screenLockReason() == nil
+        else { return false }
         let keys = keys
         _ = await selfTestOffMain { keys.quickCommandTab(gap: 0.012) }
         let back = try await waitFor(1, nil) { self.frontPid == pid } != nil
@@ -525,6 +564,10 @@ final class SelfTest {
             run.fail("didn't post a key: the list isn't open (phase \(phase), list visible \(listVisible))")
             return false
         }
+        if let reason = Self.screenLockReason() {
+            run.fail("didn't post a key: \(reason)")
+            return false
+        }
         keys.press(key)
         return true
     }
@@ -549,7 +592,10 @@ final class SelfTest {
     }
 
     /// Leaves nothing held: ends Picking or Cycling and makes sure ⌘ is up. Returns what it did.
+    /// The gaps inside a ⌘ tap or an Esc-then-⌘-up can't throw, so a stop never leaves ⌘ down.
     func clean(_ run: ScenarioRun?) async throws -> [String] {
+        cleaning = true
+        defer { cleaning = false }
         var actions: [String] = []
         var up = await switcher() != nil
         if phase == "picking" || (up && !keys.isCommandHeld) {
@@ -558,7 +604,7 @@ final class SelfTest {
                 keys.commandUp()
             } else {
                 keys.commandDown()
-                try await sleep(0.04, run)
+                try? await Task.sleep(for: .milliseconds(40))
                 keys.commandUp()
             }
             actions.append("⌘ tap to end Picking")
@@ -573,7 +619,7 @@ final class SelfTest {
             if up {
                 keys.press(SelfTestKeys.escape)
                 actions.append("Esc with ⌘")
-                try await sleep(0.04, run)
+                try? await Task.sleep(for: .milliseconds(40))
             }
             keys.commandUp()
             actions.append("⌘ up")
