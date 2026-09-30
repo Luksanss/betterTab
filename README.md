@@ -1,3 +1,5 @@
+<img src="design/icon/AppIcon.png" width="128" alt="BetterTab's icon: a keycap labelled A">
+
 # BetterTab
 
 A ⌘⇥ for macOS that knows about windows.
@@ -28,6 +30,12 @@ stacked behind their icon. Single-window apps switch natively.
 | **Esc**, or **⌘** pressed and released | Cancels |
 | **⌘⇥** | Goes back to cycling |
 
+To switch between the windows of the app you're in, hold ⌘ and press §, the key above Tab on an
+ISO keyboard. It works like ⌘⇥, but for that app's windows: each tile shows where its window sits
+on its display. Press § again to move on (⇧§ goes back), and release ⌘ to open the highlighted
+window. A quick ⌘§ tap flips to the window you were in before. A, S, D… open a window at once,
+and Esc cancels.
+
 The menu-bar item shows whether BetterTab is active and which version it is, and has Launch at
 Login and Quit. There are no settings.
 
@@ -39,8 +47,8 @@ the Accessibility grant on every rebuild.
 
 ## Privacy
 
-No network code, analytics or crash reporting. Window titles stay in memory only while the
-switcher is open, and are never logged.
+No network code, analytics or crash reporting. Window titles and positions stay in memory only
+while a switcher is open, and are never logged.
 
 ## More
 

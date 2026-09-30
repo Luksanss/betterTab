@@ -67,10 +67,13 @@ final class WindowList {
         return action
     }
 
-    /// Closes at once: the native switcher vanishes instantly, and they close together.
+    /// Closes at once: the native switcher vanishes instantly, and they close together. Also drops
+    /// the titles the model and the rows hold (docs/spec.md § Privacy).
     func hide() {
         listView.layer?.removeAllAnimations()
         panel.orderOut(nil)
+        model = WindowListModel(windows: [])
+        listView.render(model, labels: labels)
     }
 
     @discardableResult

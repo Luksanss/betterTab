@@ -79,6 +79,7 @@ release instead (2026-09-29, `docs/product.md`). The research still applies to r
 | `StackEdgesOverlay` | A transparent, click-through panel above the native switcher. Behind each multi-window icon it draws the top edges of one or two more windows, from the icon's AX frame. |
 | `KeyTap` | A session-level `CGEvent` tap; details below. |
 | `WindowList` | The panel above the highlighted icon (design v4/v5). |
+| `WindowSwitcher` | ⌘§'s own panel: one tile per window with its outline (design v6, direction 3). See § ⌘§. |
 | `Focuser` | Bring one specific window to the front and make it key. |
 | `Permissions` | Check for and request Accessibility; show its state in the menu-bar item. |
 
@@ -87,8 +88,9 @@ frames, with five apps). The switcher is 712 × 176 pt. Each icon's AX frame is 
 icon image fills it, so the visible rounded square is 103 pt (Apple's icon grid: an 824 pt body
 on a 1024 pt canvas). Icons are 6 pt apart, with 24 pt of padding around them. The Dock's
 highlight is the frame inset by 4 pt, and the app's name sits just below the frame, where the old
-dots were. The stack edges rise at most about 7 pt above the body, which keeps them inside the
-highlight. The self-test notes these frames in its `stack-edges` scenario.
+dots were. That leaves 8.5 pt between the body and the highlight's top, and two stack edges rise
+about 8.4 pt, filling it. The self-test notes these frames in its `stack-edges` scenario and fails
+edges that come within 4 pt of the frame's top.
 
 **`KeyTap` in detail.** In Cycling, it passes everything through, but watches for ⌘ being
 released. If the highlighted app has two or more windows, it swallows that release and moves to
@@ -108,6 +110,44 @@ flashes less:
 - **Cancel (Esc or the 15 s timeout):** pass Esc to the Dock, then post the ⌘ release.
 - **⌘⇥ again:** pass Tab to the Dock, since it still believes ⌘ is held, and go back to Cycling.
 
+## ⌘§: the window switcher (added 2026-09-30)
+
+macOS has no switcher for one app's windows, so BetterTab draws this one entirely, and nothing
+native is held open. That makes it much simpler than route A+:
+
+```
+⌘§ ─► KeyTap: swallow §, enter Windows ─► WindowSwitchController ─► WindowIndex (SkyLight order)
+        § / keys: swallowed, forwarded        │  model: tiles, highlight
+        ⌘ release: passed ─► "commit"        ▼
+                                   WindowSwitcher panel (after 160 ms) ─► pick ─► Focuser
+```
+
+- **The tap** swallows the ⌘§ keyDown (key code 10, `kVK_ISO_Section`) and enters Windows. There it
+  swallows every keyDown while ⌘ is held, forwarding § as a step and the rest as keys, and passes
+  the ⌘ release, which commits. Nothing is ever owed to the Dock, so no exit posts anything. ⌘⇥
+  passes and moves to Cycling. A keyDown with ⌘ up means the release got past the tap, and it
+  counts as the release. The tap being turned off or stopped cancels.
+- **The front app** is `NSWorkspace.frontmostApplication`. A SkyLight snapshot, about 1 ms, tells
+  at once whether it has two windows; if not, the controller ends the session straight away, so a
+  ⌘-shortcut typed next isn't swallowed.
+- **Order:** `WindowIndex.load(order: .windowServer)` keeps SkyLight's order as it stands, which
+  puts the window you're in first. The ⌘⇥ list moves AX's main window to the front instead, but on
+  SkyLight's first delivery that comes from the element cache and can be stale; for ⌘§, right
+  after a ⌘§ flip, it names the window you just left.
+- **Frames:** `SLSGetWindowBounds` gives every real window's frame in global coordinates, on any
+  Space, with no permission (measured on macOS 27, including full-screen windows on other Spaces
+  and a second display at negative x). Each window's display is the one it overlaps most, from
+  `CGGetActiveDisplayList` and `CGDisplayBounds`. The tile draws that display's box and the
+  window's rectangle inside it.
+- **The quick tap:** the panel appears 160 ms after ⌘§, or at once when the highlight moves. A
+  release before SkyLight's windows arrive (a few milliseconds) opens the highlighted window as soon
+  as they do.
+- **Focusing** is the list's: `Focuser.focus`. The target app is already in front, so a window on
+  another Space depends on the make-key record and the raise switching Space: `activate`, the
+  fallback, does nothing for an app that's frontmost.
+- **The panel** is an `OverlayPanel` that takes the mouse, since there's no native switcher for a
+  click to close.
+
 ## APIs
 
 | Need | API | Private? | Permission |
@@ -118,6 +158,8 @@ flashes less:
 | Windows and titles | `AXUIElementCreateApplication(pid)` → `kAXWindowsAttribute`; for each window `kAXTitleAttribute`, `kAXSubroleAttribute`, `kAXMinimizedAttribute` | public | Accessibility |
 | Letter labels for the user's layout | `UCKeyTranslate` on the current keyboard layout, for key codes `kVK_ANSI_A … kVK_ANSI_L` | public | none |
 | AX window → `CGWindowID` | `_AXUIElementGetWindow` | private | Accessibility |
+| A window's frame, on any Space (⌘§ outlines) | `SLSGetWindowBounds(cid, wid, &rect)` (verified by probe, 2026-09-30) | private | none |
+| Display frames in the same coordinates | `CGGetActiveDisplayList`, `CGDisplayBounds` | public | none |
 | Focus one window | `_SLPSSetFrontProcessWithOptions(psn, wid, userGenerated)`, then a make-key nudge, then `kAXRaiseAction`. For a minimized window, first set `kAXMinimizedAttribute` to false | private (links on macOS 27, verified by probe) | Accessibility |
 | Route B only: turn native ⌘⇥ off and on | `CGSSetSymbolicHotKeyEnabled(1 or 2, Bool)`; read the state with `CGSIsSymbolicHotKeyEnabled` | private. Links on macOS 27; both read as enabled on 2026-09-29 (verified, probe) | none |
 

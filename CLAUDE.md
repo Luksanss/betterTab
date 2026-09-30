@@ -2,8 +2,9 @@
 
 A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
 switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-The whole flow is built, including windows on other Spaces, and the self-test passes. See
-`docs/handoff.md` for where testing stands.
+And ⌘§ (the key above Tab on ISO keyboards) is ⌘⇥ for the front app's windows, drawn by
+BetterTab itself. Both are built, including windows on other Spaces. See `docs/handoff.md` for
+where testing stands.
 
 ## Start here
 
@@ -41,8 +42,8 @@ One developer, one user, so keep it simple.
   `5KDU5HYH35`), so the Accessibility grant survives rebuilds. Only the maintainer can grant it;
   agents never change security settings. If signing ever fails for a new target or bundle ID, add
   `-allowProvisioningUpdates` once.
-- **Debug builds have a self-test** that drives ⌘⇥ end to end with synthetic keys and writes a
-  report without titles. Quit BetterTab first, then run
+- **Debug builds have a self-test** that drives ⌘⇥ and ⌘§ end to end with synthetic keys and
+  writes a report without titles. Quit BetterTab first, then run
   `open -g build/DerivedData.noindex/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
   (`--long` adds the 15 s timeout test). It presses keys and switches Spaces for about two minutes,
   so only run it when the maintainer isn't using the Mac, and never with the screen locked.

@@ -1,21 +1,20 @@
 # Handoff
 
-Updated on 2026-09-30, just before release 4. On the Debug build of `dev` the maintainer said
-"the cmd § is working for me" and "Otherwise the betterTab works perfectly", so this handoff
-assumes `dev` is merged into `main` straight after it; `/handoff` checks that against git. The
-handoff as it stood before, with the story of the ⌘§ session, is archived at
-`docs/archive/handoffs/2026-09-30-window-switcher.md`. The one as of release 3 is
-`docs/archive/handoffs/2026-09-30.md`.
+Updated on 2026-09-30, late, after building ⌘§. The last release is release 3: GitHub pull request
+#3 (`Luksanss/betterTab`) merged `dev` into `main` at 00:42, and pull request #4 fixed the release
+workflow at 00:47. That run published **v0.1.49**, signed ad-hoc because the run found no
+`SIGNING_CERT_P12` secret. The maintainer installed it and it works. The handoff as of that
+release is archived at `docs/archive/handoffs/2026-09-30.md`.
 
-Release 4 carries, since v0.1.49:
-- **The keycap icon labelled A,** for the app and the menu bar.
-- **Bolder stack edges,** approved on the real switcher.
-- **⌘§, a window switcher for the front app** (see Decisions), which the maintainer has used live.
-- **The ⌘⇥ list forgets its titles when it closes:** `WindowList.hide` resets the model and its
-  rows (`docs/spec.md` § Privacy).
-
-It's the first 1.0: `MARKETING_VERSION` went from 0.1 to 1.0, so the release is **v1.0.63**. That's
-62 commits across `main` and `dev`, up to the one that bumped the version, plus the merge.
+Since the release, all on `dev` and not yet released:
+- **The keycap icon labelled A** (concept B, "Key") replaced the window glyph, which looked like
+  macOS's Screen Mirroring icon. It's now the menu-bar icon too, and a PNG of it is in the repo.
+- **Bolder stack edges.** The maintainer checked them on the real switcher: "the edges look good
+  now". That closes the question; variant C isn't needed.
+- **The ⌘⇥ list forgets its titles when it closes** (`8992977`, from a separate task session).
+- **⌘§**, a window switcher for the front app, which the maintainer asked for and designed with
+  Claude Design (see Decisions). It's built, reviewed and checked offscreen, but it hasn't worked
+  live yet: see Next action 1.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -32,21 +31,20 @@ ticket tracker; the next action below is the backlog.
 
 ## Working copy state
 
-- **`main`** should be `dev` merged in: release 4. Before the merge it was `d565ede`, release 3.
-  The agent merged it with `--no-ff` and pushed `main` and `dev`, on the maintainer's request.
-  Check with `git log --oneline -3 main` and the repo's Releases page for v1.0.63.
-- **`dev`** is `main`'s second parent, and pushed.
-- **The installed app is still v0.1.49** in `/Applications`: ad-hoc, with the old window-glyph
-  icon.
-- **The Debug build is running** (pid 26995, started 23:41) from `build/DerivedData.noindex`, with
-  every code change on `dev`. It's **untrusted**: Accessibility was reset to see the first-launch
-  prompt (Findings), and its toggle is still off, so its tap isn't running and ⌘⇥ is native. Quit
-  it before starting any other copy: two copies means two key taps.
+- **`main`** is `d565ede`, the merge of pull request #4: release 3. `origin/main` matches.
+- **`dev`** is `main` plus the keycap icon, the release 3 archive, the bolder edges and their
+  handoff, all pushed. On top of that, and not pushed: `8992977` (the list's titles), then this
+  session's commits: the menu-bar icon, the Claude Design brief, window frames, ⌘§, its self-test
+  scenarios, and the docs with this handoff.
 - **A leftover worktree:** `.claude/worktrees/relaxed-swanson-940c4a` on branch
-  `claude/relaxed-swanson-940c4a`, from the task session that made the list fix and this handoff.
-  Its branch is at `dev`'s tip. Its Debug and Release builds are registered with Launch Services,
-  so run `lsregister -u` on both `.app`s under its `build/DerivedData.noindex/Build/Products/`
-  before `git worktree remove` and `git branch -D`.
+  `claude/relaxed-swanson-940c4a`, from the task session that made `8992977`. Its commit is on
+  `dev` already, so the maintainer can remove the worktree and the branch.
+- **The Debug build is running** (started 22:16), not the release, and it has every change in
+  it. Quit it before starting the installed release, the self-test or a fresh Debug build: two
+  copies means two key taps. The code hasn't changed since it was built; only docs have.
+- **Accessibility had to be granted again** for this Debug build. It launched untrusted, showed
+  the system prompt, and was trusted from 22:17. The Apple Development signing should have kept
+  the old grant, and why it didn't is unknown.
 - **Dev builds** go to `build/DerivedData.noindex`. The `CLAUDE.md` check passes. The only
   `warning:` line is `appintentsmetadataprocessor`'s "Metadata extraction skipped", a tool message
   that isn't from our code.
@@ -57,32 +55,39 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Install release 4, v1.0.63.** Quit the Debug copy, replace `/Applications/BetterTab.app` with
-   the release's zip, and open it. It's ad-hoc like v0.1.49, so macOS asks for Accessibility again.
-   Then check the menu's version (acceptance test 21), and that the Accessibility row in System
-   Settings shows the keycap (Findings).
-2. **Get the signing secrets working** (`docs/releasing.md` § Signing with your certificate). Check
-   the names with `gh secret list`. The next run's summary says whether it signed. The first signed
-   release makes macOS ask for Accessibility once more; after that, updates keep the grant.
-3. **Find out what the Space switch in `BetterTab/Focus/Focuser.swift` really does.** Every
-   cross-Space pick on 2026-09-30 logged "space didn't switch" after its 300 ms wait and fell back
-   to `activate`, yet the maintainer says those picks work, ⌘§'s between two full-screen windows
-   included. Measure when the Space actually changes, make the log say what happened, and see
-   whether a pick can take less than the ~330 ms before the fallback plus the slide.
-4. **Run the self-test** when the Mac is free: `open -g …/Debug/BetterTab.app --args --self-test
-   /abs/path/report.json`. It has `windows-flip`, `windows-escape` and `windows-cycle` for ⌘§ (in
-   `BetterTab/Debug/SelfTestWindowScenarios.swift`), which have never run. They need the home app
-   to have two windows, and three for `windows-cycle`; scratch TextEdit documents work.
-5. **The maintainer runs acceptance tests 1–29 by hand** (`docs/spec.md`), especially 4 (flash),
-   14 (`kill -9` recovery), 20 (other Spaces) and 22–29 (⌘§). Test 18's first-launch prompt has
-   been seen on a Debug build; whether v0.1.49 showed it on its own first launch is unknown.
-6. **Still to discuss** (the maintainer said "we will discuss later"):
+1. **See ⌘§ work live.** The maintainer pressed it twice at 22:58, and both times the controller
+   ended it at once: "⌘§: the front app has fewer than two windows". The log hides the pid, so it's
+   unknown whether that app really had one window. Ask which app was in front. Then try it in
+   Chrome ×2 (both full-screen) and in a Finder or TextEdit with windows on one Space, and read the
+   log: `/usr/bin/log show --last 5m --info --predicate 'subsystem == "com.luksanss.BetterTab"'`
+   (plain `log` is a zsh builtin). If Chrome counts fewer than two, the check at the top of
+   `WindowSwitchController.start` is the suspect: it counts `SkyLightWindows.snapshot()` windows
+   for `NSWorkspace.frontmostApplication`. Then run acceptance tests 22–29.
+2. **Fix the Space switch in `BetterTab/Focus/Focuser.swift`.** ⌘§ now depends on it: two
+   full-screen Chrome windows are on two Spaces, and `activate`, the fallback, does nothing for an
+   app that's already in front. Every cross-Space pick on 2026-09-30 logged "space didn't switch"
+   after its 300 ms wait: 21 of 21, none "switched". The 17 picks on the current Space took 40–55 ms. Find out
+   whether the slide starts later than 300 ms or never, and what makes it start for the front app.
+3. **Run the self-test** when the Mac is free: `open -g …/Debug/BetterTab.app --args --self-test
+   /abs/path/report.json`. It now has `windows-flip`, `windows-escape` and `windows-cycle` (in
+   `BetterTab/Debug/SelfTestWindowScenarios.swift`). They need the home app to have two windows,
+   and three for `windows-cycle`; scratch TextEdit documents work. They've never run.
+4. **Push `dev` and merge it** when the maintainer is happy with the icon, the edges and ⌘§. That
+   publishes the next release.
+5. **Get the signing secrets working** (`docs/releasing.md` § Signing with your certificate). Check
+   the names with `gh secret list`. The next run's summary says whether it signed. v0.1.49 is
+   ad-hoc, so the first signed release makes macOS ask for Accessibility once more. After that,
+   updates keep the grant.
+6. **The maintainer runs acceptance tests 1–29 by hand** (`docs/spec.md`), especially 4 (flash),
+   14 (`kill -9` recovery), 18 (the first-launch prompt: did it appear when v0.1.49 first
+   launched?), 20 (other Spaces) and 22–29 (⌘§).
+7. **Still to discuss** (the maintainer said "we will discuss later"):
    - making a quick ⌘⇥ flip-back always native, rather than depending on whether Accessibility
      answered in time;
    - marking list rows whose window is on another Space;
    - ⌘§ on ANSI keyboards, which have no § key (their key above Tab is ⌘`'s);
    - ⌘§'s order across Spaces (Findings).
-7. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
+8. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
 
 ## Decisions already settled
 
@@ -124,10 +129,6 @@ ticket tracker; the next action below is the backlog.
   no Developer ID and no notarization; users click Open Anyway once. There are no automatic
   updates, because the app has no network code. The version is `MARKETING_VERSION` plus the commit
   count, so `0.1.87` means 87 commits.
-- **Release 4 is 1.0** (maintainer, 2026-09-30: "this is the first 1.0.0 release"). Only the
-  BetterTab target's `MARKETING_VERSION` moved to 1.0; Experiment's stays 0.1. Asked whether the
-  last part should restart at 0, the maintainer kept the commit count, so the release is v1.0.63
-  and `release.yml` is unchanged.
 - **The first launch without Accessibility shows the system prompt once,** and **the menu shows the
   version** (maintainer, 2026-09-29). The flag is `promptedForAccessibility` in `UserDefaults`.
 - **The app icon is a home-row keycap labelled A** (maintainer, 2026-09-30). It's an Icon Composer
@@ -140,7 +141,7 @@ ticket tracker; the next action below is the backlog.
   after the first live run found nothing: the maintainer keeps Chrome and Claude full-screen).
   Accessibility stays the only permission. Background native tabs still don't count.
 - **Sign with the maintainer's Apple Development certificate** (maintainer, 2026-09-29), not ad hoc,
-  so the grant should survive rebuilds. On 2026-09-30 it didn't, twice (Findings).
+  so the grant survives rebuilds (it didn't this once; see Working copy state).
 - **The ⌘⇥ list ignores the mouse, and a click ends the switch** (test 0: any click closes the
   native switcher). The ⌘§ switcher does take the mouse, since nothing native is underneath.
 - **⌘ pressed and released while the ⌘⇥ list is open cancels** (agent's call).
@@ -153,35 +154,10 @@ ticket tracker; the next action below is the backlog.
   every feature beyond `docs/spec.md` as needing a reason. "DockDoor has it" is not a reason.
 - **One working branch** (maintainer, 2026-09-29). Commit straight to `dev`; `main` moves only when
   the maintainer says a version works, and every push to `main` publishes a release. Agents never
-  push or open pull requests, unless the maintainer asks for that push, as for release 4.
+  push or open pull requests.
 - **No ticket tracker.**
 
 ## Findings worth keeping
-
-**From the release 4 handover (2026-09-30, late):**
-- **"space didn't switch" in the focus log doesn't mean the pick failed.** At 23:11 the
-  maintainer's two ⌘§ picks between two full-screen windows both logged it and fell back to
-  `activate` after about 335 ms, and the maintainer says ⌘§ works. Either the 300 ms wait gives
-  its verdict before the Space has moved, or `activate` does more for the front app than assumed.
-- **System Settings has one Accessibility row per bundle ID, with the icon of the copy in
-  `/Applications`.** Five copies are registered as `com.luksanss.BetterTab`: v0.1.49, and the Debug
-  and Release builds in the checkout and in the worktree. The row showed v0.1.49's window glyph
-  while the keycap Debug build was the one running. It should change once a keycap release
-  replaces v0.1.49; if not, quit and reopen System Settings.
-- **Showing the first-launch prompt again takes two resets.** The grant:
-  `tccutil reset Accessibility com.luksanss.BetterTab`, which the maintainer runs, since agents
-  don't change security settings. It resets every registered copy, the installed release too. And
-  the app's flag: `defaults delete com.luksanss.BetterTab promptedForAccessibility`. After both, the
-  23:41 launch logged "First launch without Accessibility: showing the system prompt".
-- **New Debug builds lost the grant twice; relaunching the same build kept it.** The 22:16 launch
-  was untrusted and re-granted at 22:17. The 22:59 rebuild launched untrusted at 23:38 and was
-  granted at 23:38:09, and that same build relaunched at 23:39:10 trusted. The Debug build's
-  designated requirement names the certificate (`anchor apple generic and certificate
-  leaf[subject.CN] = "Apple Development: …"`), which should survive rebuilds; v0.1.49's is a
-  `cdhash`. The cause is unknown. The suspect is the one TCC record all five copies share.
-- **The agent's shell may not quit or launch BetterTab.** Claude Code's auto-mode check refused
-  both `kill -TERM` and `open -g` on the app ("Interfere With Workloads"). Ask the maintainer to run
-  them. `kill -TERM` is safe: `TapSignals` stops the tap and posts any owed ⌘ release first.
 
 **From the ⌘§ session (2026-09-30, evening):**
 - **SkyLight gives window frames with no permission.** `SLSGetWindowBounds(cid, wid, &rect)`
@@ -195,11 +171,12 @@ ticket tracker; the next action below is the backlog.
   order, which puts the window you're in first. That order is close to most recently used, but a
   window on another Space always comes after the current Space's windows.
 - **What `open` does with a running app.** `open build/…/BetterTab.app` on a copy that's already
-  running only brings that copy forward. Check the process's start time against the binary's
-  (`ps -o lstart`, `stat`) to know which build is live.
+  running only brings that copy forward; the maintainer quit the old one first. Check the process's
+  start time against the binary's (`ps -o lstart`, `stat`) to know which build is live.
 - **Plain `log` is a zsh builtin** (`too many arguments`). Use `/usr/bin/log show`.
 - **Offscreen rendering can't show `NSVisualEffectView`.** It draws flat grey, so the agent's
-  renders of `WindowSwitcherView` hid it and painted the design's colours behind.
+  renders of `WindowSwitcherView` hid it and painted the design's colours behind. Whether `.hudWindow`
+  looks right in light mode on screen is still unseen.
 - **Claude Design projects are readable through `DesignSync`** (`get_file`), even an ordinary
   project rather than a design system. The v6 prototype is `Window Switcher v6.dc.html`. It has all
   three directions, the "Outlines: title" toggle (default Show), and the timings: the switcher shows
@@ -269,12 +246,11 @@ window. The detail and the API table are in `docs/architecture.md`.
 
 ## Known gaps
 
-- **Cross-Space focusing always logs a fallback,** although the picks work (Next action 3).
-- **New builds lose the Accessibility grant** despite the certificate signing (Findings).
-- **Whether ⌘§'s `.hudWindow` material looks right in light mode is unseen.**
+- **⌘§ hasn't worked live.** Its two presses ended as "fewer than two windows" (Next action 1). The
+  outline view was only checked offscreen, and its material never on screen.
+- **Cross-Space focusing falls back to `activate` every time,** which can't help ⌘§ (Next action 2).
 - **The release workflow's keychain import has never run.**
-- **The first-launch prompt is unconfirmed for a release** (acceptance test 18); it has been seen
-  on a Debug build.
+- **The first-launch prompt is unconfirmed for v0.1.49** (acceptance test 18).
 - **Unverified on macOS 27:**
   - whether another window of the app flashes before the picked one;
   - whether a lone make-key mouse down leaves an app thinking the button is held;

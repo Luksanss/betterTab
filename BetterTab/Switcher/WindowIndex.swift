@@ -15,10 +15,12 @@ nonisolated struct AppWindow: @unchecked Sendable {
     /// The Space it's on, or 0 if unknown.
     let spaceID: UInt64
     let isFullScreen: Bool
+    /// In the window server's global coordinates (points, top-left origin). `.null` if unknown.
+    let frame: CGRect
 
     init(
         windowID: CGWindowID, element: AXUIElement?, title: String, isMinimized: Bool,
-        spaceID: UInt64 = 0, isFullScreen: Bool = false
+        spaceID: UInt64 = 0, isFullScreen: Bool = false, frame: CGRect = .null
     ) {
         self.windowID = windowID
         self.element = element
@@ -26,20 +28,23 @@ nonisolated struct AppWindow: @unchecked Sendable {
         self.isMinimized = isMinimized
         self.spaceID = spaceID
         self.isFullScreen = isFullScreen
+        self.frame = frame
     }
 
     /// This window, with the title and element of `earlier` where it has none of its own.
     func filling(from earlier: AppWindow) -> AppWindow {
         AppWindow(
             windowID: windowID, element: element ?? earlier.element, title: title.isEmpty ? earlier.title : title,
-            isMinimized: isMinimized, spaceID: spaceID, isFullScreen: isFullScreen)
+            isMinimized: isMinimized, spaceID: spaceID, isFullScreen: isFullScreen,
+            frame: frame.isNull ? earlier.frame : frame)
     }
 
-    /// Whether two lists would give the same rows and the same focus targets.
+    /// Whether two lists would give the same rows, the same outlines and the same focus targets.
     static func sameRows(_ a: [AppWindow], _ b: [AppWindow]) -> Bool {
         a.count == b.count && zip(a, b).allSatisfy { a, b in
             a.windowID == b.windowID && a.title == b.title && a.isMinimized == b.isMinimized
                 && (a.element == nil) == (b.element == nil) && a.spaceID == b.spaceID && a.isFullScreen == b.isFullScreen
+                && a.frame == b.frame
         }
     }
 }
@@ -86,7 +91,9 @@ final class WindowIndex {
     /// empty, elements from the cache), then again for an app whenever AX or the remote-token
     /// scan changes what it has: titles, elements, windows that turn out not to be standard. An
     /// app with no real window gets no call. A hung app keeps SkyLight's untitled windows.
-    func load(pids: [pid_t], onResult: @escaping (pid_t, [AppWindow]) -> Void) {
+    func load(
+        pids: [pid_t], order: WindowOrder = .mainWindowFirst, onResult: @escaping (pid_t, [AppWindow]) -> Void
+    ) {
         var seen = Set<pid_t>()
         let pids = pids.filter { $0 > 0 && seen.insert($0).inserted }
         guard !pids.isEmpty else { return }
@@ -96,7 +103,7 @@ final class WindowIndex {
         let epoch = epoch
         let wanted = epoch.current
         WindowLoader(
-            cache: cache, readers: readers, scans: scans, scanBudget: Self.scanBudget,
+            cache: cache, readers: readers, scans: scans, scanBudget: Self.scanBudget, order: order,
             // Checked before every step and every scanned id, so nothing lingers after `cancel()`.
             isWanted: { epoch.current == wanted },
             deliver: { [weak self] pid, windows in
@@ -118,7 +125,7 @@ final class WindowIndex {
         guard !warmedUp else { return }
         warmedUp = true
         WindowLoader(
-            cache: cache, readers: readers, scans: scans, scanBudget: Self.warmUpScanBudget,
+            cache: cache, readers: readers, scans: scans, scanBudget: Self.warmUpScanBudget, order: .mainWindowFirst,
             isWanted: { true }, deliver: { _, _ in }, finished: { _, _ in }
         ).start(pids)
     }

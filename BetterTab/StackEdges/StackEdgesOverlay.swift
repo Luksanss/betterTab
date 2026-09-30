@@ -9,10 +9,11 @@ final class StackEdgesOverlay {
     /// draws an 824 pt body on a 1024 pt canvas. Measured on macOS 27: 128 pt frames, 103 pt bodies.
     static let bodyScale: CGFloat = 824.0 / 1024
     /// Each edge rises this far above the one in front of it, as a share of the body's side. Two
-    /// edges stay inside the Dock's highlight, which is the frame inset by 4 pt.
-    static let rise: CGFloat = 0.035
+    /// edges fill the room up to the Dock's highlight, which is the frame inset by 4 pt: 8.5 pt
+    /// above a 103 pt body.
+    static let rise: CGFloat = 0.041
     /// Each edge is this much narrower than the one in front of it, as a share of the body's side.
-    static let narrowing: CGFloat = 0.12
+    static let narrowing: CGFloat = 0.10
     /// Corner radius as a share of the width, close to the icon body's own corners.
     static let cornerScale: CGFloat = 0.225
     /// The clear line between an edge and whatever is in front of it, as a share of the body's
@@ -72,9 +73,9 @@ private final class StackEdgesView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current else { return }
         let isDark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        // Front edge first; the one behind it is fainter. Dark mode was checked on the real
-        // switcher; light mode mirrors it.
-        let alphas: [CGFloat] = isDark ? [0.56, 0.34] : [0.36, 0.22]
+        // Front edge first; the one behind it is fainter. Both were too faint to read at a glance
+        // at [0.56, 0.34] dark and [0.36, 0.22] light.
+        let alphas: [CGFloat] = isDark ? [0.85, 0.55] : [0.62, 0.40]
 
         for icon in icons {
             let stack = StackEdgesOverlay.stack(iconFrame: icon.frame, windowCount: icon.windowCount)

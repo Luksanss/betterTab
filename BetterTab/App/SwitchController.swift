@@ -21,6 +21,8 @@ final class SwitchController {
     private let index = WindowIndex()
     private let list = WindowList()
     private let stackEdges = StackEdgesOverlay()
+    /// ⌘§. It shares the index, so the element cache warmed for ⌘⇥ serves it too.
+    private lazy var windowSwitch = WindowSwitchController(tap: tap, index: index)
     private let logger = Logger(subsystem: "com.luksanss.BetterTab", category: "switch")
 
     private enum Phase: Equatable {
@@ -81,11 +83,22 @@ final class SwitchController {
             pickingStartedAt = .now
             present(session: message.generation, snapshot: watcher.current)
         case .key(let code):
-            key(code, session: message.generation)
+            if windowSwitch.isActive {
+                windowSwitch.key(code, session: message.generation)
+            } else {
+                key(code, session: message.generation)
+            }
         case .backToCycling:
             backToCycling()
         case .cycleEnded, .pickingEnded:
             reset()
+        case .windowsStarted(let backwards):
+            reset()
+            windowSwitch.start(session: message.generation, backwards: backwards)
+        case .windowStep(let delta):
+            windowSwitch.step(by: delta, session: message.generation)
+        case .windowsEnded(let commit):
+            windowSwitch.ended(commit: commit)
         }
     }
 
@@ -185,8 +198,9 @@ final class SwitchController {
         return true
     }
 
-    /// Back to Idle: nothing on screen, nothing observed, no window data kept.
+    /// Back to Idle: nothing on screen, nothing observed, no window data kept. Ends ⌘§ too.
     private func reset() {
+        windowSwitch.reset()
         phase = .idle
         listed = nil
         epoch += 1
