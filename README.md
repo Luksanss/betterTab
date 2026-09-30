@@ -1,3 +1,5 @@
+<img src="design/icon/AppIcon.png" width="128" alt="BetterTab's icon: a keycap labelled A">
+
 # BetterTab
 
 A ⌘⇥ for macOS that knows about windows.
