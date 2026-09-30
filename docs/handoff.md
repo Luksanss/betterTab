@@ -14,8 +14,8 @@ Release 4 carries, since v0.1.49:
 - **The ⌘⇥ list forgets its titles when it closes:** `WindowList.hide` resets the model and its
   rows (`docs/spec.md` § Privacy).
 
-With one merge commit and nothing else added, the release is **v0.1.62**: 60 commits across `main`
-and `dev`, this handoff's commit, and the merge.
+It's the first 1.0: `MARKETING_VERSION` went from 0.1 to 1.0, so the release is **v1.0.63**. That's
+62 commits across `main` and `dev`, up to the one that bumped the version, plus the merge.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -33,8 +33,9 @@ ticket tracker; the next action below is the backlog.
 ## Working copy state
 
 - **`main`** should be `dev` merged in: release 4. Before the merge it was `d565ede`, release 3.
-  Check with `git log --oneline -3 main` and the repo's Releases page.
-- **`dev`** is pushed up to `d58e5a9`. This handoff's commit, on top of it, isn't.
+  The agent merged it with `--no-ff` and pushed `main` and `dev`, on the maintainer's request.
+  Check with `git log --oneline -3 main` and the repo's Releases page for v1.0.63.
+- **`dev`** is `main`'s second parent, and pushed.
 - **The installed app is still v0.1.49** in `/Applications`: ad-hoc, with the old window-glyph
   icon.
 - **The Debug build is running** (pid 26995, started 23:41) from `build/DerivedData.noindex`, with
@@ -56,8 +57,8 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Install release 4.** Quit the Debug copy, replace `/Applications/BetterTab.app` with the
-   release's zip, and open it. It's ad-hoc like v0.1.49, so macOS asks for Accessibility again.
+1. **Install release 4, v1.0.63.** Quit the Debug copy, replace `/Applications/BetterTab.app` with
+   the release's zip, and open it. It's ad-hoc like v0.1.49, so macOS asks for Accessibility again.
    Then check the menu's version (acceptance test 21), and that the Accessibility row in System
    Settings shows the keycap (Findings).
 2. **Get the signing secrets working** (`docs/releasing.md` § Signing with your certificate). Check
@@ -123,6 +124,10 @@ ticket tracker; the next action below is the backlog.
   no Developer ID and no notarization; users click Open Anyway once. There are no automatic
   updates, because the app has no network code. The version is `MARKETING_VERSION` plus the commit
   count, so `0.1.87` means 87 commits.
+- **Release 4 is 1.0** (maintainer, 2026-09-30: "this is the first 1.0.0 release"). Only the
+  BetterTab target's `MARKETING_VERSION` moved to 1.0; Experiment's stays 0.1. Asked whether the
+  last part should restart at 0, the maintainer kept the commit count, so the release is v1.0.63
+  and `release.yml` is unchanged.
 - **The first launch without Accessibility shows the system prompt once,** and **the menu shows the
   version** (maintainer, 2026-09-29). The flag is `promptedForAccessibility` in `UserDefaults`.
 - **The app icon is a home-row keycap labelled A** (maintainer, 2026-09-30). It's an Icon Composer
@@ -148,7 +153,7 @@ ticket tracker; the next action below is the backlog.
   every feature beyond `docs/spec.md` as needing a reason. "DockDoor has it" is not a reason.
 - **One working branch** (maintainer, 2026-09-29). Commit straight to `dev`; `main` moves only when
   the maintainer says a version works, and every push to `main` publishes a release. Agents never
-  push or open pull requests.
+  push or open pull requests, unless the maintainer asks for that push, as for release 4.
 - **No ticket tracker.**
 
 ## Findings worth keeping
