@@ -60,6 +60,14 @@ chose picking after release. The list only appears for apps with more than one w
 choosing is an expected step, not a surprise. The stack edges show beforehand which apps will ask.
 The accepted cost is one key press (A) even when the most recent window is the one you want.
 
+**⌘§ for the app you're in (added 2026-09-30).** In daily use the maintainer found that the app
+you're already in is the one ⌘⇥ makes hardest to reach: another Chrome window meant cycling
+through every other app and back. ⌘§, the key above Tab on an ISO keyboard, is ⌘⇥ for the front
+app's windows: hold ⌘, § steps, releasing opens, and a quick tap flips to the previous window. It
+fixes what ⌘` lacks: you see where you're going, and it reaches full-screen windows and other
+Spaces. Each tile draws the window's outline on its display, because pictures would need Screen
+Recording. The maintainer chose these outlines from three Claude Design directions.
+
 ## Scope
 
 The exact behaviour, what's out of scope, and the acceptance tests are in `docs/spec.md`. That
