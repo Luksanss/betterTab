@@ -87,8 +87,9 @@ frames, with five apps). The switcher is 712 × 176 pt. Each icon's AX frame is 
 icon image fills it, so the visible rounded square is 103 pt (Apple's icon grid: an 824 pt body
 on a 1024 pt canvas). Icons are 6 pt apart, with 24 pt of padding around them. The Dock's
 highlight is the frame inset by 4 pt, and the app's name sits just below the frame, where the old
-dots were. The stack edges rise at most about 7 pt above the body, which keeps them inside the
-highlight. The self-test notes these frames in its `stack-edges` scenario.
+dots were. That leaves 8.5 pt between the body and the highlight's top, and two stack edges rise
+about 8.4 pt, filling it. The self-test notes these frames in its `stack-edges` scenario and fails
+edges that come within 4 pt of the frame's top.
 
 **`KeyTap` in detail.** In Cycling, it passes everything through, but watches for ⌘ being
 released. If the highlighted app has two or more windows, it swallows that release and moves to

@@ -1,9 +1,10 @@
 # Handoff
 
-Updated on 2026-09-30, after release 3. GitHub pull request #3 (`Luksanss/betterTab`) merged `dev`
-into `main` at 00:42, with the stack edges, the first-launch prompt, the version in the menu, the
-app icon, the release workflow and the shorter README. The handoff as of that release, with the
-story of the session that built it, is archived at `docs/archive/handoffs/2026-09-30.md`.
+Updated on 2026-09-30, after making the stack edges bolder. The last release is release 3: GitHub
+pull request #3 (`Luksanss/betterTab`) merged `dev` into `main` at 00:42, with the stack edges, the
+first-launch prompt, the version in the menu, the app icon, the release workflow and the shorter
+README. The handoff as of that release, with the story of the session that built it, is archived
+at `docs/archive/handoffs/2026-09-30.md`.
 
 The first release run failed at "Select Xcode 27" (see Findings). Pull request #4 fixed it and
 merged at 00:47, and that run published **v0.1.49**, the first release. The maintainer installed it
@@ -11,8 +12,13 @@ in `/Applications` and it works. It's signed ad-hoc, because the run found no `S
 secret.
 
 After the release, the maintainer asked for a different app icon: the window glyph looked like
-macOS's Screen Mirroring icon. `dev` now carries the keycap icon (concept B, "Key"), not yet
+macOS's Screen Mirroring icon. `dev` now carries the keycap icon (concept B, "Key"), and it's
 pushed.
+
+Then the maintainer looked at the stack edges on the real switcher, in v0.1.49, and found them too
+faint in both appearances: "light mode is a bit better but still not enough, dark mode is rough".
+The next session made them bolder in `BetterTab/StackEdges/StackEdgesOverlay.swift` (see
+Decisions). That commit isn't pushed.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -30,13 +36,15 @@ ticket tracker; the next action below is the backlog.
 ## Working copy state
 
 - **`main`** is `d565ede`, the merge of pull request #4: release 3. `origin/main` matches.
-- **`dev`** is `main` plus two commits that aren't pushed: the keycap icon and this handoff.
+- **`dev`** is `main` plus the keycap icon and the release 3 archive, both pushed, then two
+  commits that aren't pushed: the bolder stack edges and this handoff.
 - **Releases:** v0.1.49 is the latest, signed ad-hoc. The run log shows `P12:` empty, so either the
   secrets were never added or their names don't match `SIGNING_CERT_P12` and
   `SIGNING_CERT_PASSWORD`.
-- **The maintainer runs the release,** `/Applications/BetterTab.app` 0.1.49. Don't launch a dev
-  build while it runs: two copies means two key taps both holding the switcher. Quit the installed
-  copy first for live tests and the self-test, and start it again afterwards.
+- **The Debug build is running, not the release.** The maintainer quit
+  `/Applications/BetterTab.app` 0.1.49 so the bolder edges could be tried. Quit the Debug copy
+  before starting the release again: two copies means two key taps both holding the switcher. The
+  same goes the other way for live tests and the self-test.
 - **Dev builds** go to `build/DerivedData.noindex`, which keeps them out of Spotlight. The
   `CLAUDE.md` check passes. The only `warning:` line is `appintentsmetadataprocessor`'s "Metadata
   extraction skipped", a tool message that isn't from our code.
@@ -45,15 +53,17 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Get the signing secrets working** (`docs/releasing.md` § Signing with your certificate). Check
+1. **The maintainer's verdict on the bolder stack edges,** in both appearances on the real
+   switcher. The agent only saw them in an offscreen mock. The maintainer went to the handover
+   without asking for more. If they're still too faint, the next step is variant C (see
+   Decisions), which means changing a spec rule first. A switcher crowded enough to shrink its
+   icons, and a second display, are still unchecked.
+2. **Push `dev` and merge it** when the maintainer is happy with the keycap icon and the edges.
+   That publishes them as the next release.
+3. **Get the signing secrets working** (`docs/releasing.md` § Signing with your certificate). Check
    the names with `gh secret list`. The next run's summary says whether it signed. v0.1.49 is
    ad-hoc, so the first signed release makes macOS ask for Accessibility once more. After that,
    updates keep the grant.
-2. **Push `dev` and merge it** when the maintainer is happy with the keycap icon. That publishes it
-   as the next release.
-3. **Look at the stack edges in daily use.** Only dark mode was checked on the real switcher.
-   Light mode was only rendered offscreen over a stand-in background. A switcher crowded enough to
-   shrink its icons, and a second display, are unchecked.
 4. **Fix the Space switch in `BetterTab/Focus/Focuser.swift`.** Every cross-Space pick in the first
    live run logged `space didn't` after its 300 ms poll and fell back to `activate`, which took
    about 336 ms before the fallback even started. The self-test runs didn't cover this, because no
@@ -78,6 +88,19 @@ ticket tracker; the next action below is the backlog.
     both on a screenshot of the real switcher. It's symmetrical and stays inside the Dock's
     highlight. The diagonal one looked like a Copy icon.
   - One edge for two windows, two for three or more. The exact count is the list's job.
+- **Stack edges: bolder, still inside the highlight** (maintainer asked for bolder, 2026-09-30; the
+  agent chose how far to go).
+  - Opacity went from `[0.56, 0.34]` dark and `[0.36, 0.22]` light (front edge, back edge) to
+    `[0.85, 0.55]` and `[0.62, 0.40]`.
+  - `rise` went from 0.035 to 0.041 of the body's side, so each visible strip is about 3.2 pt, up
+    from 2.6. `narrowing` went from 0.12 to 0.10, so the edges read more like windows.
+  - The strips can't get thicker inside the highlight: two edges now rise 8.4 pt, and the room is
+    8.5 pt. Acceptance test 2 says "The edges stay inside the switcher's highlight", and the
+    self-test fails edges within 4 pt of the icon frame's top.
+  - **Variant C, if still too faint:** `rise` 0.052, so strips of about 4.4 pt. The back edge then
+    pokes about 2 pt above the highlight on the selected app. That needs the maintainer to drop
+    the spec line, and the self-test headroom check in `SelfTestScenarios.swift` to go with it.
+    The mock showed it as clearly bolder, but crossing the highlight looks less tidy.
 - **Releases: the free route, automatic on every push to `main`** (maintainer, 2026-09-29). There's
   no Developer ID and no notarization; users click Open Anyway once, and the maintainer considers
   that normal on macOS. There are no automatic updates, because the app has no network code.
@@ -133,6 +156,20 @@ ticket tracker; the next action below is the backlog.
 - **No ticket tracker.**
 
 ## Findings worth keeping
+
+**From the stack edges session (2026-09-30):**
+- **The old edges drew exactly as coded; they were just thin and grey.** Pixels sampled from a
+  screenshot of the real dark switcher gave the front edge 162 and the back edge 121, on a
+  background of 49 (0–255). That's what alphas 0.56 and 0.34 of white give. Each visible strip was
+  about 2.6 pt: `rise` minus the 1 pt gap.
+- **The highlight's visible top is 8 pt above the icon's body, not the 8.5 pt the geometry
+  predicts.** Measured on the same 2× screenshot: body top at 98 px, highlight top at 82 px. So at
+  `rise` 0.041 the back edge may overlap the highlight's top by about 0.4 pt. The self-test won't
+  catch it, since it checks against the frame.
+- **How the variants were compared, without touching the screen:** a Swift script drew the edges
+  the way `StackEdgesView.draw` does onto an old screenshot of the real switcher (dark), and onto a
+  stand-in with `NSWorkspace` icons (light). Both went to PNG. The script and screenshot were in a
+  session scratchpad and are gone; rebuild them from `StackEdgesOverlay.stack` if needed.
 
 **From the first releases (2026-09-30):**
 - **`cmd | grep -q` fails a step under `pipefail`.** `grep -q` stops reading at the first match, so
@@ -292,8 +329,10 @@ detail and API table are in `docs/architecture.md`.
 - **The release workflow's keychain import has never run.** No `SIGNING_CERT_P12` has reached it.
 - **The first-launch prompt is unconfirmed.** v0.1.49's first launch should have shown it; ask the
   maintainer. Acceptance test 18 covers it.
-- **Stack edges are unverified on the real switcher in light mode,** and with icons the switcher has
-  shrunk. The geometry is proportional to the frame, so it should scale.
+- **The bolder stack edges have no recorded verdict from the real switcher.** The maintainer saw
+  the old ones in both appearances. The new ones were only mocked offscreen, and then run as a
+  Debug build for the maintainer. Shrunk icons are unchecked. The geometry is proportional to the
+  frame, so it should scale.
 - **Unverified on macOS 27:**
   - how long the Space slide takes, and whether steps 4–6 of the focus sequence move the Space
     without `activate`;
