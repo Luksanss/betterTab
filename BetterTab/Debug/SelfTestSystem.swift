@@ -272,6 +272,8 @@ nonisolated final class SelfTestKeys: Sendable {
     static let downArrow: CGKeyCode = 125
     static let letterA: CGKeyCode = 0
     static let letterS: CGKeyCode = 1
+    /// `kVK_ISO_Section`, the § key above Tab on ISO keyboards.
+    static let section: CGKeyCode = 10
 
     /// ⌘ and the left-⌘ device bit, plus non-coalesced: what a real left ⌘ sets while it's down.
     static let commandFlags = CGEventFlags(rawValue: 0x100108)
@@ -311,6 +313,17 @@ nonisolated final class SelfTestKeys: Sendable {
         commandDown()
         Thread.sleep(forTimeInterval: gap)
         press(Self.tab, gap: gap)
+        Thread.sleep(forTimeInterval: gap)
+        commandUp()
+        return Date().timeIntervalSince(start)
+    }
+
+    /// ⌘ down, §, ⌘ up, spaced `gap` apart: a ⌘§ tap. Blocks, like `quickCommandTab`.
+    func quickCommandSection(gap: TimeInterval) -> TimeInterval {
+        let start = Date()
+        commandDown()
+        Thread.sleep(forTimeInterval: gap)
+        press(Self.section, gap: gap)
         Thread.sleep(forTimeInterval: gap)
         commandUp()
         return Date().timeIntervalSince(start)

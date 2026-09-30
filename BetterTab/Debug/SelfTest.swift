@@ -601,6 +601,12 @@ final class SelfTest {
         cleaning = true
         defer { cleaning = false }
         var actions: [String] = []
+        if phase == "windows", keys.isCommandHeld {
+            // ⌘§ is open: Esc closes it without opening anything, so ⌘ can go up after.
+            keys.press(SelfTestKeys.escape)
+            actions.append("Esc to close ⌘§")
+            _ = try await waitFor(1, run) { self.phase != "windows" }
+        }
         var up = await switcher() != nil
         if phase == "picking" || (up && !keys.isCommandHeld) {
             // A ⌘ press and release ends Picking in the tap itself, whatever the list shows.

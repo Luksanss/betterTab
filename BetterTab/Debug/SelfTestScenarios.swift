@@ -45,6 +45,7 @@ extension SelfTest {
         try await scenario("timeout-16s", timeout: 30, skip: noMulti ?? (options.long ? nil : "needs --long")) {
             try await noInputTimeout($0)
         }
+        try await runWindowScenarios()
         try await scenario("cmd-not-stuck") { try await commandNotStuck($0) }
     }
 
