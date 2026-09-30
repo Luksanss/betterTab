@@ -13,13 +13,21 @@ nonisolated enum TapEvent: Sendable {
     case cycleEnded
     /// ⌘ was released with `holdOnRelease` set. The release was swallowed; the switcher is held.
     case pickingStarted
-    /// A keyDown during Picking, swallowed. Autorepeats come only for ↑ and ↓.
+    /// A keyDown during Picking or Windows, swallowed. Autorepeats come only for the arrows.
     case key(UInt16)
     /// ⌘⇥ during Picking. The Tab went to the Dock, which moved its highlight on. The ⌘ release is
     /// still owed and carries over.
     case backToCycling
     /// Picking ended; what it owed has been posted.
     case pickingEnded(TapEndReason)
+    /// ⌘§ was pressed and swallowed: the window switcher for the front app opens. Shift steps
+    /// backwards, as in ⌘⇧⇥.
+    case windowsStarted(backwards: Bool)
+    /// § again during Windows, swallowed: move the highlight by this much. Repeats while held.
+    case windowStep(Int)
+    /// Windows ended. `commit` when ⌘ was released, so the highlighted window opens; false when
+    /// the tap stopped or was turned off. Not sent when the controller ended it with `endWindows`.
+    case windowsEnded(commit: Bool)
 }
 
 nonisolated struct TapMessage: Sendable {
@@ -103,6 +111,13 @@ nonisolated final class KeyTap: Sendable {
     @discardableResult
     func endHold(_ how: HoldEnd, session: UInt64) -> Bool {
         machine.endHold(how, session: session)
+    }
+
+    /// Main actor. Ends Windows session `session` (the generation of its `.windowsStarted`). Posts
+    /// nothing, since the window switcher holds nothing back. False once that session is over.
+    @discardableResult
+    func endWindows(session: UInt64) -> Bool {
+        machine.endWindows(session: session)
     }
 }
 

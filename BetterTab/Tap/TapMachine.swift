@@ -18,8 +18,14 @@ nonisolated enum TapKey {
     static let escape: Int64 = 53
     static let command: Int64 = 55
     static let rightCommand: Int64 = 54
+    static let leftArrow: Int64 = 123
+    static let rightArrow: Int64 = 124
     static let downArrow: Int64 = 125
     static let upArrow: Int64 = 126
+    /// `kVK_ISO_Section`: the § key, above Tab on ISO keyboards. ANSI keyboards have no such key.
+    static let section: Int64 = 10
+
+    static let arrows: Set<Int64> = [leftArrow, rightArrow, downArrow, upArrow]
 }
 
 /// Nanoseconds on a clock that keeps counting while the Mac sleeps (Darwin's CLOCK_MONOTONIC),
@@ -30,6 +36,8 @@ nonisolated enum TapPhase: String, Sendable {
     case idle = "Idle"
     case cycling = "Cycling"
     case picking = "Picking"
+    /// The ⌘§ window switcher. Nothing is swallowed that macOS is owed: ⌘ passes both ways.
+    case windows = "Windows"
 }
 
 nonisolated enum TapInputKind: Sendable {
@@ -100,6 +108,10 @@ nonisolated enum TapNote: Sendable {
     case nativeCancel
     case owedReleasePaid
     case backToCycling(keys: Int)
+    case windowsStarted
+    case windowsReleased
+    case windowsMissedRelease
+    case windowsToCycling
 
     func log() {
         let logger = TapLog.logger
@@ -116,6 +128,14 @@ nonisolated enum TapNote: Sendable {
             logger.info("Idle: a physical ⌘ release passed, so the Dock has its release")
         case .backToCycling(let keys):
             logger.info("Picking → Cycling: ⌘⇥ again after \(keys, privacy: .public) keys; the ⌘ release is still owed")
+        case .windowsStarted:
+            logger.info("Idle → Windows: ⌘§ swallowed")
+        case .windowsReleased:
+            logger.info("Windows → Idle: ⌘ release passed")
+        case .windowsMissedRelease:
+            logger.info("Windows → Idle: a key came with ⌘ up, so its release got past us")
+        case .windowsToCycling:
+            logger.info("Windows → Cycling: ⌘⇥ passed")
         }
     }
 }
@@ -197,9 +217,9 @@ nonisolated final class TapMachine: Sendable {
             r.verdict = .swallow
             return r
         }
-        if e.kind == .keyDown, s.phase != .picking, s.swallowedKeys.contains(e.keycode) {
-            // A key still held from a Picking session that has ended, or gone back to cycling:
-            // keep its repeats away from the Dock and the app.
+        if e.kind == .keyDown, s.phase != .picking, s.phase != .windows, s.swallowedKeys.contains(e.keycode) {
+            // A key still held from a Picking or Windows session that has ended, or gone back to
+            // cycling: keep its repeats away from the Dock and the app.
             if e.autorepeat {
                 r.verdict = .swallow
                 return r
@@ -218,6 +238,16 @@ nonisolated final class TapMachine: Sendable {
                     s.enter(.cycling, at: e.now)
                     r.event = .cycleStarted
                     r.note = .cycleStarted
+                } else if e.keycode == TapKey.section, command, e.flags.intersection(blocked).isEmpty {
+                    // ⌘§ does nothing in macOS, so it's always ours. Main ends the session at once
+                    // if the front app has fewer than two windows.
+                    r.verdict = .swallow
+                    s.swallowedKeys.insert(e.keycode)
+                    // It came with ⌘, whatever the last flagsChanged said.
+                    s.commandDown = true
+                    s.enter(.windows, at: e.now)
+                    r.event = .windowsStarted(backwards: e.flags.contains(.maskShift))
+                    r.note = .windowsStarted
                 }
             case .flagsChanged:
                 let wasDown = s.commandDown
@@ -305,6 +335,47 @@ nonisolated final class TapMachine: Sendable {
                 // still down when ⌘ was released. Its keyUp goes to the Dock too.
                 r.verdict = e.keycode == TapKey.tab ? .passAddingCommand(keycode: s.commandKeycode) : .swallow
             }
+
+        case .windows:
+            switch e.kind {
+            case .flagsChanged:
+                s.commandDown = command
+                if !command {
+                    // ⌘ released: it passes, as it would anyway, and the highlighted window opens.
+                    s.owesCommandRelease = false
+                    s.enter(.idle, at: e.now)
+                    r.event = .windowsEnded(commit: true)
+                    r.note = .windowsReleased
+                }
+            case .keyDown:
+                if !command {
+                    // ⌘ is physically up, so its release got past us. Do what the release would
+                    // have done, and let this key through to the app.
+                    s.enter(.idle, at: e.now)
+                    r.event = .windowsEnded(commit: true)
+                    r.note = .windowsMissedRelease
+                } else if e.keycode == TapKey.tab, e.flags.intersection([.maskControl, .maskAlternate]).isEmpty {
+                    // ⌘⇥ from the window switcher opens the app switcher, which ends this one.
+                    s.holdOnRelease = false
+                    s.enter(.cycling, at: e.now)
+                    r.event = .cycleStarted
+                    r.note = .windowsToCycling
+                } else {
+                    // The switcher keeps the keyboard until ⌘ goes up: no ⌘-shortcut reaches the app.
+                    r.verdict = .swallow
+                    s.swallowedKeys.insert(e.keycode)
+                    if e.keycode == TapKey.section {
+                        // Held down, § repeats and walks on, like Tab in ⌘⇥.
+                        r.event = .windowStep(e.flags.contains(.maskShift) ? -1 : 1)
+                    } else if !e.autorepeat || TapKey.arrows.contains(e.keycode) {
+                        r.event = .key(UInt16(truncatingIfNeeded: e.keycode))
+                    }
+                }
+            case .keyUp:
+                // Keys whose keyDown was swallowed were handled above; the rest were down before
+                // the switcher opened, and the app gets their keyUp.
+                break
+            }
         }
         return r
     }
@@ -324,12 +395,14 @@ nonisolated final class TapMachine: Sendable {
         case .idle: nil
         case .cycling: .cycleEnded
         case .picking: .pickingEnded(reason)
+        case .windows: .windowsEnded(commit: false)
         }
         return EndPlan(
             from: from,
             reason: reason,
-            // In Idle a native Esc has closed the switcher already; Esc would reach the front app.
-            postEscape: how == .cancel && owed && from != .idle,
+            // In Idle a native Esc has closed the switcher already, and in Windows the Dock shows
+            // none: Esc would reach the front app.
+            postEscape: how == .cancel && owed && (from == .cycling || from == .picking),
             postRelease: owed,
             commandKeycode: s.commandKeycode,
             keys: keys,
@@ -348,6 +421,18 @@ nonisolated final class TapMachine: Sendable {
         guard let plan else { return false }
         execute(plan)
         return true
+    }
+
+    /// Ends Windows session `session`, if it's still the one running: a pick, a cancel, or an app
+    /// with too few windows. Nothing is owed, so nothing is posted. Returns whether it did.
+    func endWindows(session: UInt64) -> Bool {
+        let ended = state.withLock { s in
+            guard s.phase == .windows, s.generation == session else { return false }
+            s.enter(.idle, at: continuousNanos())
+            return true
+        }
+        if ended { TapLog.logger.info("Windows → Idle: ended by the controller") }
+        return ended
     }
 
     /// Ends whatever is running and posts what's owed, in any phase. For stopping and for the tap
