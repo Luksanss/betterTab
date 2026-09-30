@@ -35,6 +35,9 @@ nonisolated struct SkyLightWindow: Sendable, Equatable {
     let spaceID: UInt64
     let isMinimized: Bool
     let isFullScreen: Bool
+    /// In the window server's global coordinates (points, top-left origin), on whichever Space it's
+    /// on. `.null` when SkyLight can't say, or when the snapshot wasn't asked for this app's.
+    let frame: CGRect
 }
 
 /// Every app's real windows at one moment.
@@ -50,10 +53,11 @@ nonisolated struct SkyLightSnapshot: Sendable {
 /// window server. It needs no permission (measured on macOS 27); the one thing it can't give is
 /// titles, which come from AX. Any thread; calls are serialized. About 1 ms once warm.
 nonisolated enum SkyLightWindows {
-    /// nil if SkyLight lacks one of the functions or the window server gave no answer.
-    static func snapshot() -> SkyLightSnapshot? {
+    /// nil if SkyLight lacks one of the functions or the window server gave no answer. Frames
+    /// cost a round trip per window, so they're read only for the apps in `framesOf`.
+    static func snapshot(framesOf: Set<pid_t> = []) -> SkyLightSnapshot? {
         guard let functions = SkyLightFunctions.shared else { return nil }
-        return lock.withLock { _ in read(functions) }
+        return lock.withLock { _ in read(functions, framesOf: framesOf) }
     }
 
     /// The window server's first answer about Spaces takes 10–15 ms; this pays for it at launch,
@@ -85,7 +89,7 @@ nonisolated enum SkyLightWindows {
     /// Set on full-screen windows (measured); the Space's type is checked first.
     private static let fullScreenTag: UInt64 = 1 << 42
 
-    private static func read(_ sls: SkyLightFunctions) -> SkyLightSnapshot? {
+    private static func read(_ sls: SkyLightFunctions, framesOf: Set<pid_t>) -> SkyLightSnapshot? {
         let connection = sls.mainConnectionID()
         guard let displays = sls.copyManagedDisplaySpaces(connection)?.takeRetainedValue() as? [[String: Any]]
         else { return nil }
@@ -141,9 +145,17 @@ nonisolated enum SkyLightWindows {
             windowsByPid[row.pid, default: []].append(SkyLightWindow(
                 windowID: row.windowID, spaceID: space,
                 isMinimized: row.tags & minimizedTag != 0,
-                isFullScreen: fullScreenSpaces.contains(space) || row.tags & fullScreenTag != 0))
+                isFullScreen: fullScreenSpaces.contains(space) || row.tags & fullScreenTag != 0,
+                frame: framesOf.contains(row.pid) ? frame(sls, connection, row.windowID) : .null))
         }
         return SkyLightSnapshot(windowsByPid: windowsByPid, currentSpaceIDs: current)
+    }
+
+    /// Needs no permission, and answers for windows on other Spaces too (measured on macOS 27).
+    private static func frame(_ sls: SkyLightFunctions, _ connection: Int32, _ windowID: CGWindowID) -> CGRect {
+        guard let getWindowBounds = sls.getWindowBounds else { return .null }
+        var frame = CGRect.null
+        return getWindowBounds(connection, windowID, &frame) == .success ? frame : .null
     }
 
     private static func windowIDs(_ sls: SkyLightFunctions, _ connection: Int32, on spaces: [UInt64]) -> CFArray? {
@@ -176,6 +188,7 @@ nonisolated private struct SkyLightFunctions: Sendable {
     typealias IteratorUInt32 = @convention(c) (CFTypeRef) -> UInt32
     typealias IteratorInt32 = @convention(c) (CFTypeRef) -> Int32
     typealias IteratorUInt64 = @convention(c) (CFTypeRef) -> UInt64
+    typealias GetWindowBounds = @convention(c) (Int32, UInt32, UnsafeMutablePointer<CGRect>) -> CGError
 
     let mainConnectionID: MainConnectionID
     let copyManagedDisplaySpaces: CopyManagedDisplaySpaces
@@ -189,6 +202,8 @@ nonisolated private struct SkyLightFunctions: Sendable {
     let iteratorLevel: IteratorInt32
     let iteratorTags: IteratorUInt64
     let iteratorAttributes: IteratorUInt64
+    /// Only the ⌘§ switcher's window outlines need it, so a macOS without it keeps everything else.
+    let getWindowBounds: GetWindowBounds?
 
     static let shared: SkyLightFunctions? = load()
 
@@ -220,11 +235,15 @@ nonisolated private struct SkyLightFunctions: Sendable {
               let tags = resolve("SLSWindowIteratorGetTags", IteratorUInt64.self),
               let attributes = resolve("SLSWindowIteratorGetAttributes", IteratorUInt64.self)
         else { return nil }
+        let getWindowBounds = dlsym(handle, "SLSGetWindowBounds").map { unsafeBitCast($0, to: GetWindowBounds.self) }
+        if getWindowBounds == nil {
+            log.error("private symbol SLSGetWindowBounds is missing; the ⌘§ switcher shows no window outlines")
+        }
         return SkyLightFunctions(
             mainConnectionID: mainConnectionID, copyManagedDisplaySpaces: copyManagedDisplaySpaces,
             copyWindowsWithOptionsAndTags: copyWindows, queryWindows: queryWindows,
             queryResultCopyWindows: queryResultCopyWindows, iteratorAdvance: advance, iteratorWindowID: windowID,
             iteratorPID: pid, iteratorParentID: parentID, iteratorLevel: level, iteratorTags: tags,
-            iteratorAttributes: attributes)
+            iteratorAttributes: attributes, getWindowBounds: getWindowBounds)
     }
 }

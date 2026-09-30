@@ -120,6 +120,16 @@ nonisolated struct AXPass: Sendable {
     var order: [CGWindowID] = []
 }
 
+/// Which window a list starts with.
+nonisolated enum WindowOrder: Sendable {
+    /// docs/spec.md § The window list: the window plain ⌘⇥ brings forward comes first.
+    case mainWindowFirst
+    /// The window server's order as it stands: the current Space front to back, so the window
+    /// you're in comes first, then the other Spaces, most recently visited first. For ⌘§, where
+    /// the main window remembered from an earlier AX read can be stale.
+    case windowServer
+}
+
 nonisolated enum WindowReader {
     enum FactsRead {
         case facts(WindowFacts)
@@ -194,12 +204,14 @@ nonisolated enum WindowReader {
     /// The app's windows as the list shows them: SkyLight's, less any AX says aren't standard
     /// windows, with what AX knows of each. `pass` is nil before AX has been asked.
     static func windows(
-        real: [SkyLightWindow]?, pass: AXPass?, cached: [CGWindowID: AXElement], cachedFront: CGWindowID?
+        real: [SkyLightWindow]?, pass: AXPass?, cached: [CGWindowID: AXElement], cachedFront: CGWindowID?,
+        order: WindowOrder = .mainWindowFirst
     ) -> [AppWindow] {
         let facts = pass?.facts ?? [:]
         // Without SkyLight, AX's own list is all there is: the current Space only.
         let base = real ?? (pass?.order ?? []).map {
-            SkyLightWindow(windowID: $0, spaceID: 0, isMinimized: facts[$0]?.isMinimized ?? false, isFullScreen: false)
+            SkyLightWindow(
+                windowID: $0, spaceID: 0, isMinimized: facts[$0]?.isMinimized ?? false, isFullScreen: false, frame: .null)
         }
         var windows: [AppWindow] = []
         for window in base {
@@ -209,9 +221,12 @@ nonisolated enum WindowReader {
             windows.append(AppWindow(
                 windowID: window.windowID, element: (known?.element ?? cached[window.windowID])?.element,
                 title: known?.title ?? "", isMinimized: known?.isMinimized ?? window.isMinimized,
-                spaceID: window.spaceID, isFullScreen: window.isFullScreen))
+                spaceID: window.spaceID, isFullScreen: window.isFullScreen, frame: window.frame))
         }
-        return ordered(windows, front: pass?.answer == .answered ? pass?.front : cachedFront)
+        switch order {
+        case .mainWindowFirst: return ordered(windows, front: pass?.answer == .answered ? pass?.front : cachedFront)
+        case .windowServer: return ordered(windows, front: nil)
+        }
     }
 
     /// docs/spec.md § The window list: A is the window plain ⌘⇥ brings forward (the main window,
@@ -234,13 +249,14 @@ nonisolated final class WindowLoader: Sendable {
     private let readers: DispatchQueue
     private let scans: DispatchQueue
     private let scanBudget: Double
+    private let order: WindowOrder
     private let isWanted: @Sendable () -> Bool
     private let deliver: @Sendable (pid_t, [AppWindow]) -> Void
     /// Once per app, after its AX pass; nil if it needed none.
     private let finished: @Sendable (pid_t, AXAnswer?) -> Void
 
     init(
-        cache: ElementCache, readers: DispatchQueue, scans: DispatchQueue, scanBudget: Double,
+        cache: ElementCache, readers: DispatchQueue, scans: DispatchQueue, scanBudget: Double, order: WindowOrder,
         isWanted: @escaping @Sendable () -> Bool,
         deliver: @escaping @Sendable (pid_t, [AppWindow]) -> Void,
         finished: @escaping @Sendable (pid_t, AXAnswer?) -> Void
@@ -249,6 +265,7 @@ nonisolated final class WindowLoader: Sendable {
         self.readers = readers
         self.scans = scans
         self.scanBudget = scanBudget
+        self.order = order
         self.isWanted = isWanted
         self.deliver = deliver
         self.finished = finished
@@ -258,7 +275,8 @@ nonisolated final class WindowLoader: Sendable {
         readers.async { [self] in
             guard isWanted() else { return }
             let started = DispatchTime.now().uptimeNanoseconds
-            let snapshot = SkyLightWindows.snapshot()
+            // Only ⌘§ draws window outlines.
+            let snapshot = SkyLightWindows.snapshot(framesOf: order == .windowServer ? Set(pids) : [])
             if let snapshot {
                 cache.prune(to: snapshot)
                 let ms = Double(DispatchTime.now().uptimeNanoseconds &- started) / 1e6
@@ -274,7 +292,8 @@ nonisolated final class WindowLoader: Sendable {
                 var shown: [AppWindow] = []
                 if let real, !real.isEmpty {
                     shown = WindowReader.windows(
-                        real: real, pass: nil, cached: cache.elements(of: pid), cachedFront: cache.front(of: pid))
+                        real: real, pass: nil, cached: cache.elements(of: pid), cachedFront: cache.front(of: pid),
+                        order: order)
                     deliver(pid, shown)
                 }
                 // AX only adds titles and drops non-standard windows, and an app with one window or
@@ -293,7 +312,8 @@ nonisolated final class WindowLoader: Sendable {
         let pass = WindowReader.axPass(
             pid: pid, real: real.map { Set($0.map(\.windowID)) }, cache: cache, isWanted: isWanted)
         let cached = cache.elements(of: pid)
-        let windows = WindowReader.windows(real: real, pass: pass, cached: cached, cachedFront: cache.front(of: pid))
+        let windows = WindowReader.windows(
+            real: real, pass: pass, cached: cached, cachedFront: cache.front(of: pid), order: order)
         if !AppWindow.sameRows(windows, shown) { deliver(pid, windows) }
         finished(pid, pass.answer)
 
@@ -326,9 +346,10 @@ nonisolated final class WindowLoader: Sendable {
             if case .facts(let facts) = WindowReader.facts(of: element) { pass.facts[id] = facts }
         }
         // Read again: the scan took a while, and a window may have closed meanwhile.
-        let fresh = SkyLightWindows.snapshot().map { $0.windowsByPid[pid] ?? [] } ?? real
+        let fresh = SkyLightWindows.snapshot(framesOf: order == .windowServer ? [pid] : [])
+            .map { $0.windowsByPid[pid] ?? [] } ?? real
         let windows = WindowReader.windows(
-            real: fresh, pass: pass, cached: cache.elements(of: pid), cachedFront: nil)
+            real: fresh, pass: pass, cached: cache.elements(of: pid), cachedFront: nil, order: order)
         if !AppWindow.sameRows(windows, shown) { deliver(pid, windows) }
     }
 }
