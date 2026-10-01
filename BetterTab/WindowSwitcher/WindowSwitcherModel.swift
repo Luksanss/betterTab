@@ -1,5 +1,6 @@
 import Carbon.HIToolbox
 import CoreGraphics
+import Foundation
 
 /// One of the front app's windows, as the ⌘§ switcher needs it.
 struct WindowSwitcherItem: Equatable {
@@ -48,7 +49,7 @@ struct WindowSwitcherModel: Equatable {
     /// The highlight keeps its tile number, clamped to the new tiles.
     mutating func setWindows(_ windows: [WindowSwitcherItem]) {
         tiles = windows.prefix(Self.maxTiles).enumerated().map { index, window in
-            Tile(windowIndex: index, title: WindowListModel.displayTitle(window.title),
+            Tile(windowIndex: index, title: Self.displayTitle(window.title),
                  isMinimized: window.isMinimized, windowFrame: window.windowFrame,
                  displayFrame: window.displayFrame)
         }
@@ -89,5 +90,9 @@ struct WindowSwitcherModel: Equatable {
             guard let tile = KeyLabels.keyCodes.firstIndex(of: keyCode), tile < tiles.count else { return nil }
             return .pick(tiles[tile].windowIndex)
         }
+    }
+
+    static func displayTitle(_ title: String) -> String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled" : title
     }
 }

@@ -2,105 +2,48 @@
 
 This file is the source of truth for what BetterTab does. `docs/product.md` explains why and
 `docs/architecture.md` explains how. When they disagree with this file about behaviour, this
-file wins. Rewritten 2026-09-29 around the maintainer's flow: pick the window after releasing ⌘.
-The look comes from the Claude design (v4 reviewed; v5 brief in `docs/design-brief-v5.md`).
-Changed 2026-09-30: stack edges replace the window-count dots, the first launch shows the
-Accessibility prompt, the menu shows the version, and every push to `main` publishes a release.
-Later that day, ⌘§ was added: a window switcher for the app you're in (§ ⌘§ below).
+file wins. Written 2026-09-29; the stack edges come from the Claude design v5
+(`docs/design-brief-v5.md`) and ⌘§ from v6 (`docs/design-brief-v6.md`). Changed 2026-09-30: stack
+edges replaced the window-count dots, the first launch shows the Accessibility prompt, the menu
+shows the version, every push to `main` publishes a release, and ⌘§ was added. Changed
+2026-10-01: ⌘⇥ is native again. The window list it opened on release is gone (§ Out of scope).
 
 ## In one sentence
 
-Release ⌘⇥ on an app with more than one window, and instead of switching, a small list of that
-app's windows opens above its icon. Press A, S, D… to go straight to the one you want. And ⌘§
-does for the app you're in what ⌘⇥ does for apps: it cycles through that app's windows.
+⌘§ is ⌘⇥ for the windows of the app you're in: hold ⌘, press § to step through them, and let go
+to open one. And while you ⌘⇥, apps with more than one window show the edges of more windows
+behind their icon.
 
 ## Principles
 
 These decide every case this spec doesn't cover.
 
-1. **Single-window apps aren't touched.** If the app you release on has one window (or none),
-   the switch is pure native ⌘⇥.
+1. **⌘⇥ is macOS's.** BetterTab draws the stack edges over the native switcher and changes nothing
+   else about it: every key passes, and every switch is native.
 2. **⌘⇥ always works.** Whatever happens to BetterTab (a crash, a hang, a missing permission,
    a macOS update), the Mac is never left without a working ⌘⇥ or with ⌘ stuck down.
-3. **One job: getting to the right window.** Two shortcuts, ⌘⇥ and ⌘§, and nothing else: no
-   settings window, no thumbnails, no more shortcuts, no window management. A new feature needs a
-   reason stronger than "another app has it". (⌘§ came in on 2026-09-30, the maintainer's
-   decision: the app you're in was the one app ⌘⇥ made hardest to reach.)
+3. **One job: getting to the right window.** One shortcut, ⌘§, and nothing else: no settings
+   window, no thumbnails, no more shortcuts, no window management. A new feature needs a reason
+   stronger than "another app has it".
 4. **Keyboard first.** Everything can be done from the keyboard. The mouse is a convenience,
    never a requirement.
 
-## The flow
+## ⌘⇥: stack edges
 
-1. **Cycle.** Hold ⌘ and press Tab: the macOS switcher, as always. Apps with two or more windows
-   show **stack edges**: the top edges of more windows peeking out behind their icon, one edge
-   for two windows and two for three or more. That way you know before letting go which apps will
-   ask you to pick. (Dots under the icon were tried first, but they read as the Dock's "running"
-   dots and sat on the app name.)
-2. **Release on a single-window app.** The switch happens natively. BetterTab stays out of it.
-3. **Release on an app with two or more windows.** The switch does **not** happen yet. The
-   switcher stays on screen, and the **window list** opens directly above the highlighted icon.
-   The app you started from is still in front.
-4. **Pick.** Press a window's letter: that exact window comes to the front as the key window, and
-   the switcher and list close together.
-5. **Or back out.** Esc closes everything, and you're where you started, with nothing changed.
-
-### The window list
-
-- Up to **9 windows**, labelled **A S D F G H J K L** (the home row, left to right).
-  - **A** is the app's frontmost window, the one plain ⌘⇥ would have given you, and its row is
-    highlighted.
-  - After it come the app's other windows, most recently used first, then minimized windows.
-    Windows on other Spaces and full-screen windows are listed like any other.
-  - With more than 9 windows, the list ends with a line such as "+3 more", which can't be picked.
-- Letters restart at A for every app: Chrome with 3 windows gets A S D, Terminal with 2 gets A S.
-- Each row shows its letter badge, its title on one line (cut off at the end if too long), and a
-  marker if the window is minimized.
-  - A window with no title is shown as "Untitled".
-  - Two windows with the same title are both listed; their letters tell them apart.
-- Nothing else is shown: no thumbnails, no favicons, no colour squares. Real window data has no
-  source for them.
-- The list sits above the highlighted icon, centred on it, kept within the switcher's width and
-  inside the screen. It opens instantly on release; the animation is at most 150 ms.
-- It follows the system: light or dark appearance, the user's accent colour for the highlighted
-  row, and system materials.
-
-### Keys while the list is open
-
-| Key | What happens |
-|---|---|
-| **A–L** (as listed) | Opens that window. A letter with no window next to it does nothing. |
-| **↑ / ↓** | Moves the highlight. |
-| **Return** | Opens the highlighted window. |
-| **Esc** | Cancels the whole switch: you stay in the app you started from. |
-| **⌘⇥** again | Closes the list and goes back to cycling, with the next app highlighted. Releasing ⌘ then follows the flow again. |
-| **⌘** pressed and released | Cancels, like Esc. It's also the way out if anything ever seems stuck. |
-| **Anything else** | Does nothing. The list keeps the keyboard until you pick or cancel. |
-
-Letters are matched by **physical key position**, not by the character typed, and each badge is
-labelled with what the user's keyboard layout prints on that key. On AZERTY the first key is
-therefore labelled Q. **Mouse:** the list doesn't take the mouse. Experiment test 0 showed that
-any click, even one on BetterTab's own panel, closes the held-open native switcher. So clicks pass
-through the list, and a click anywhere ends the switch: the switcher and the list close together,
-nothing is picked, and the click lands on whatever is under the pointer.
-
-### Edge cases
+Hold ⌘ and press Tab: the macOS switcher, as always. Apps with two or more windows show **stack
+edges**: the top edges of more windows peeking out behind their icon, one edge for two windows
+and two for three or more. Releasing ⌘ switches natively, as it always has. If the app's most
+recent window isn't the one you want, ⌘§ gets you to the right one. (Dots under the icon were
+tried first, but they read as the Dock's "running" dots and sat on the app name.)
 
 - **Which windows count:** standard windows on every Space, including full-screen windows,
   minimized windows and the windows of hidden apps. Dialogs, palettes, sheets and background tabs
-  don't count; an app's tabs are one window, as ⌘\` treats them. (Changed 2026-09-29: the first live
-  run showed that listing only the current Space finds nothing for someone who keeps windows
-  full-screen.)
-- **A window on another Space:** picking it switches to that Space, with macOS's usual slide.
-- **The app quits or loses windows while the list is open:** the list refreshes. If one window or
-  none is left, BetterTab switches to the app natively (or cancels if the app is gone).
-- **A quick ⌘⇥ tap** stays native when ⌘ is released before BetterTab has read the highlighted
-  app's windows. The switcher takes about 150–210 ms to appear to Accessibility, so only a tap
-  faster than roughly a quarter of a second is affected. Otherwise the flow is the same however
-  fast you type.
-- **You walk away:** after **15 s** with no key pressed, the switch is cancelled, as if you'd
-  pressed Esc.
-- **Picking A** gives exactly what native ⌘⇥ would have. BetterTab doesn't focus anything
-  itself for A.
+  don't count; an app's tabs are one window, as ⌘\` treats them. ⌘§ counts the same way.
+  (Changed 2026-09-29: the first live run showed that counting only the current Space finds
+  nothing for someone who keeps windows full-screen.)
+- The edges stay inside the Dock's highlight, follow light and dark appearance, and appear on
+  whichever display the switcher is on.
+- A quick ⌘⇥ tap may close the switcher before the edges are drawn. Nothing else depends on them.
 
 ## ⌘§: the front app's windows
 
@@ -124,14 +67,17 @@ flips between them.
 
 ### The window switcher
 
-- **One tile per window,** up to 9, labelled A S D F G H J K L as in the list, by physical key and
-  with the layout's labels. With more than 9, a last "+N more" tile can't be picked.
+- **One tile per window,** up to 9, labelled **A S D F G H J K L** (the home row, left to right).
+  Letters are matched by **physical key position**, not by the character typed, and each badge is
+  labelled with what the user's keyboard layout prints on that key: on AZERTY the first key is
+  labelled Q. With more than 9 windows, a last "+N more" tile can't be picked.
 - **Each tile is a miniature of the window's display,** with the window's outline drawn where the
   window is and at its size. A full-screen window fills its display. A display of another shape
   gets a box of that shape. A minimized window's outline is dimmed, and its badge has the
   minimized marker.
-- **Only the highlighted window's title shows,** under the tiles, on up to two lines. The switcher
-  keeps one size while it's open, however long the titles.
+- **Only the highlighted window's title shows,** under the tiles, on up to two lines. A window
+  with no title is shown as "Untitled". The switcher keeps one size while it's open, however long
+  the titles.
 - **The highlighted tile** has the switcher's highlight behind it, and its outline and badge take
   the user's accent colour. Light and dark follow the system; the background is a system material.
 - **No pictures of windows.** Frames need no permission; pictures would need Screen Recording.
@@ -155,8 +101,8 @@ after those on the current one.
 | **Tab** | Closes the window switcher and opens ⌘⇥, as if ⌘⇥ had been pressed. |
 | **Anything else** | Does nothing. No ⌘-shortcut reaches the app until ⌘ is released. |
 
-**Mouse:** hovering over a tile highlights it, and a click opens that window. Unlike the ⌘⇥ list,
-there's no native switcher for a click to close.
+**Mouse:** hovering over a tile highlights it, and a click opens that window. The pointer moves
+the highlight only once it has moved, so a pointer resting where the switcher opens picks nothing.
 
 ### Edge cases
 
@@ -165,7 +111,9 @@ there's no native switcher for a click to close.
 - **There's no timeout.** ⌘ is held down the whole time, and letting go ends it.
 - **Nothing is held back from macOS.** ⌘ passes through both ways, so ⌘§ can't leave ⌘ stuck
   down. Only § and the keys pressed while the switcher is open are swallowed.
-- **A window on another Space,** full-screen or not: opening it switches to its Space.
+- **A window on another Space,** full-screen or not: opening it switches to its Space, with
+  macOS's usual slide.
+- **A minimized window** is restored and focused.
 - **ANSI keyboards** have no § key. Their key above Tab is `, and ⌘` is macOS's own "Move focus to
   next window", so ⌘§ isn't available on them for now.
 
@@ -173,13 +121,7 @@ there's no native switcher for a click to close.
 
 ```
 Idle ──⌘⇥──► Cycling (native switcher; stack edges drawn)
-                │ ⌘ released, highlighted app has ≤ 1 window ───────────► native switch ─► Idle
-                │ ⌘ released, highlighted app has ≥ 2 windows
-                ▼
-             Picking (switcher held open, list shown, highlight = A)
-                ├─ letter / Return ─► open that window ──────────────────────────────► Idle
-                ├─ Esc, or 15 s with no key ─► cancel, stay where you were ─────────► Idle
-                └─ ⌘⇥ ─► list closes, highlight moves on ─► Cycling
+                └─ ⌘ released, or Esc ─► native switch or cancel ─────────────────────► Idle
 
 Idle ──⌘§──► Windows (switcher shown after 160 ms; highlight = the previous window)
                 ├─ § / ⇧§ / arrows ─► highlight moves ─► switcher shown
@@ -192,7 +134,7 @@ When idle, BetterTab uses no CPU. It has no timers and does no polling, only the
 
 ## The menu-bar item
 
-This is the only UI besides the stack edges, the list and the ⌘§ switcher. It shows the app
+This is the only UI besides the stack edges and the ⌘§ switcher. It shows the app
 icon's keycap labelled A as a template icon, and the menu has:
 
 - **A status line:** "Active", "Needs Accessibility permission", or "Can't find the ⌘⇥
@@ -211,8 +153,8 @@ There's no Dock icon and no windows. Quit is the off switch.
   live on 2026-09-29). On macOS 27 the pane is titled "Device Control and Data Access".
 - **First launch without the permission:** the system's Accessibility prompt appears once, because
   a menu-bar item alone is easy to miss (the notch can hide it). After that only the menu offers
-  it. The menu-bar item shows its needs-permission state, and ⌘⇥ is plain native. There's no
-  onboarding window.
+  it. The menu-bar item shows its needs-permission state, there are no stack edges, and ⌘§ does
+  nothing. There's no onboarding window.
 - **When the permission is granted,** BetterTab notices within 2 s, without a restart. **When
   it's revoked,** BetterTab goes back to the needs-permission state. ⌘⇥ keeps working natively
   throughout.
@@ -228,10 +170,9 @@ and states only.
 
 | What | Target |
 |---|---|
-| List visible after releasing ⌘ | within one frame; window lists are read while the app is highlighted, before you let go |
-| Stack edges drawn after the switcher appears | under 100 ms. The window counts come from SkyLight, about 1 ms per app; AX adds only the titles, with a 250 ms timeout, so a hung app still gets its edges but untitled rows |
-| The chosen window in front after a key press | under 100 ms on the current Space; another Space adds macOS's slide |
+| Stack edges drawn after the switcher appears | under 100 ms. The window counts come from SkyLight, about 1 ms per app; AX only drops windows that aren't standard ones, with a 250 ms timeout, so a hung app still gets its edges |
 | ⌘§ switcher visible | 160 ms after ⌘§ while ⌘ is held, at once when the highlight moves; a quicker release flips without it |
+| The chosen window in front after ⌘§ | under 100 ms on the current Space; another Space adds macOS's slide |
 | Idle CPU | 0% |
 | Memory | under 30 MB |
 
@@ -244,19 +185,23 @@ These are hard-coded, with no settings UI.
 | Letters | A S D F G H J K L (physical home-row keys) |
 | Window switcher key | § (`kVK_ISO_Section`, above Tab on ISO keyboards) |
 | Window switcher shows after | 160 ms |
-| Maximum windows listed | 9 |
+| Maximum tiles | 9 |
 | Stack edges per icon | at most 2 |
 | AX messaging timeout | 250 ms |
-| Cancel after no input | 15 s |
 | Permission re-check while missing | every 2 s |
 
 ## Out of scope
 
 These aren't "later"; they're **no**, unless daily use proves otherwise:
+- **a window list on ⌘⇥.** It was built: releasing ⌘⇥ on an app with two or more windows held the
+  native switcher open and listed that app's windows to pick from. The maintainer used it, and
+  dropped it on 2026-10-01: deciding on a window at every ⌘⇥ was more mental effort than it
+  saved, while native ⌘⇥, then ⌘§ when it lands on the wrong window, needs no thought. It's in
+  release v1.0.63 and in git history;
 - thumbnails or previews (they would need Screen Recording);
-- closing, minimizing or moving windows from the list;
+- closing, minimizing or moving windows from the switcher;
 - Chrome tabs;
-- shortcuts or modes beyond ⌘⇥ and ⌘§;
+- shortcuts or modes beyond ⌘§;
 - a settings window, and per-app exclusion lists;
 - Dock previews;
 - notarization and automatic updates. Releases are zips on GitHub (`docs/releasing.md`); users
@@ -264,57 +209,39 @@ These aren't "later"; they're **no**, unless daily use proves otherwise:
 
 ## Acceptance tests
 
-Run these by hand on macOS 27 before calling the MVP done. "Chrome ×3" means three Chrome windows
-on the current Space.
+Run these by hand on macOS 27. "Chrome ×3" means three Chrome windows on the current Space.
 
-1. **Single window.** ⌘⇥ to Notes (one window) and release: a native switch, with no list.
+1. **Native ⌘⇥.** ⌘⇥ to Chrome ×3 and release: a native switch to Chrome's most recent window,
+   with nothing else on screen. The same for Notes (one window).
 2. **Stack edges.** While cycling, Chrome ×3 shows two edges behind its icon, Terminal ×2 shows
    one, and Notes shows none. The edges stay inside the switcher's highlight.
-3. **The list opens.** Release on Chrome ×3. The switcher stays, the list shows A S D above
-   Chrome with A highlighted, and the previous app is still in front.
-4. **Pick.** Press S. Chrome's second window is in front and key, and typing goes into it. Note
-   whether any other Chrome window flashes up first.
-5. **Most recent.** Press A, or Return: you get Chrome's most recent window, as native would.
-6. **Arrows.** Press ↓ ↓ then Return: window 3.
-7. **Cancel.** Press Esc. Everything closes, the previous app is still in front, and nothing has
-   changed.
-8. **Back to cycling.** With the list open, press ⌘⇥. The list closes and the next app is
-   highlighted. Release on Terminal ×2: the list shows A S.
-9. **Minimized.** Pick a minimized window: it's restored and focused.
-10. **Hidden app.** Pick window S of a hidden (⌘H) app: the app unhides and that window is in
-    front.
-11. **Many windows.** With 11 windows, the list shows A–L plus "+2 more".
-12. **Keyboard layout.** On a non-US layout, the badges show what that layout prints, and the
+3. **Stack edges, other Spaces.** With one Chrome window on Desktop 1 and two full-screen, Chrome
+   shows two stack edges.
+4. **Stack edges, second display.** With the switcher on the other display, the edges appear there.
+5. **⌘§ flip.** In Chrome ×2, tap ⌘§ quickly: the other Chrome window is in front and key, and no
+   switcher appeared. Tap it again: back to the first.
+6. **⌘§ cycle.** In Terminal ×3, hold ⌘ and press § twice: three tiles, the third highlighted.
+   Release ⌘: that window is in front.
+7. **⌘§ backwards and wrap.** Hold ⌘ and press ⇧§: the last window is highlighted. Press § on the
+   last: the highlight wraps to the first.
+8. **⌘§ letters and Esc.** Hold ⌘, press § then D: window 3 opens at once. Hold ⌘, press § then
+   Esc, and release ⌘: nothing changes, and ⌘S afterwards saves as usual.
+9. **⌘§ outlines.** A window on the left half of the screen shows a left-half outline, and a
+   full-screen one fills its box. On a second display of another shape, the box has that shape.
+10. **⌘§ one window.** In Notes ×1, ⌘§ does nothing.
+11. **⌘§ full-screen.** With two full-screen Chrome windows, ⌘§ slides to the other one's Space and
+    typing goes into it. Note whether another Chrome window flashes up first.
+12. **⌘§ minimized.** In Chrome ×3 with one window minimized, its tile comes last, dimmed and with
+    the minimized marker. Picking it restores it and focuses it.
+13. **⌘§ many windows.** With 11 Finder windows, ⌘§ shows A–L plus "+2 more".
+14. **Keyboard layout.** On a non-US layout, the badges show what that layout prints, and the
     home-row keys pick windows.
-13. **No stuck ⌘.** After a pick, a cancel and a timeout, type into TextEdit each time: you get
-    plain letters, not ⌘-shortcuts.
-14. **Crash during Picking.** `kill -9` BetterTab while the list is open, then press and release
-    ⌘. The switcher closes and ⌘⇥ works normally afterwards.
-15. **Timeout.** Leave the list open for 15 s: it cancels.
-16. **Quick tap.** Tap ⌘⇥ quickly onto Chrome ×2: the list opens, or the switch stays native if the
-    experiment ruled that out.
-17. **Second display.** With the switcher on the other display, the stack edges and list appear
-    there.
-18. **Permission.** Revoke Accessibility: the status says so and ⌘⇥ is native. Grant it: active
-    again within 2 s. On the first launch without it, the system prompt appears once, and not on
-    later launches.
-19. **Idle.** With the switcher closed for a minute, Activity Monitor shows 0% CPU.
-20. **Other Spaces.** With one Chrome window on Desktop 1 and two full-screen, Chrome shows two
-    stack edges and the list shows all three. Picking a full-screen one switches to its Space, and
-    typing goes into it.
-21. **Version.** The menu shows "Version" and the release's version, such as 0.1.87.
-22. **⌘§ flip.** In Chrome ×2, tap ⌘§ quickly: the other Chrome window is in front and key, and no
-    switcher appeared. Tap it again: back to the first.
-23. **⌘§ cycle.** In Terminal ×3, hold ⌘ and press § twice: three tiles, the third highlighted.
-    Release ⌘: that window is in front.
-24. **⌘§ backwards and wrap.** Hold ⌘ and press ⇧§: the last window is highlighted. Press § on the
-    last: the highlight wraps to the first.
-25. **⌘§ letters and Esc.** Hold ⌘, press § then D: window 3 opens at once. Hold ⌘, press § then
-    Esc, and release ⌘: nothing changes, and ⌘S afterwards saves as usual.
-26. **⌘§ outlines.** A window on the left half of the screen shows a left-half outline, and a
-    full-screen one fills its box. On a second display of another shape, the box has that shape.
-27. **⌘§ one window.** In Notes ×1, ⌘§ does nothing.
-28. **⌘§ full-screen.** With two full-screen Chrome windows, ⌘§ slides to the other one's Space and
-    typing goes into it.
-29. **⌘§ no stuck ⌘.** After a flip, an Esc, a letter pick and a click pick, type into TextEdit
-    each time: plain letters.
+15. **No stuck ⌘.** After a native ⌘⇥, a ⌘§ flip, an Esc, a letter pick and a click pick, type into
+    TextEdit each time: plain letters, not ⌘-shortcuts.
+16. **Crash.** `kill -9` BetterTab while the ⌘§ switcher is open: the switcher goes, and ⌘⇥, ⌘ and
+    typing work normally afterwards.
+17. **Permission.** Revoke Accessibility: the status says so, there are no stack edges, ⌘§ does
+    nothing, and ⌘⇥ works. Grant it: active again within 2 s. On the first launch without it, the
+    system prompt appears once, and not on later launches.
+18. **Idle.** With no switcher open for a minute, Activity Monitor shows 0% CPU.
+19. **Version.** The menu shows "Version" and the release's version, such as 1.0.70.

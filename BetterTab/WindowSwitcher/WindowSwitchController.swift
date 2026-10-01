@@ -43,8 +43,6 @@ final class WindowSwitchController {
         didSet { publishForSelfTest(ended: oldValue) }
     }
 
-    var isActive: Bool { session != nil }
-
     init(tap: KeyTap, index: WindowIndex) {
         self.tap = tap
         self.index = index
@@ -71,7 +69,7 @@ final class WindowSwitchController {
             return
         }
         session = Session(generation: generation, pid: pid, backwards: backwards)
-        index.load(pids: [pid], order: .windowServer) { [weak self] loaded, windows in
+        index.load(pids: [pid], withFrames: true) { [weak self] loaded, windows in
             guard loaded == pid else { return }
             self?.windowsLoaded(windows, generation: generation)
         }

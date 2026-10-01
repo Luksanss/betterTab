@@ -4,14 +4,13 @@ import Foundation
 // The self-test's pure parts: options, target picking, Tab counting, the window filter and the
 // report. Foundation only, so a scratch harness can compile this file on its own.
 
-/// `--self-test [<report.json>] [--long] [--pause <seconds>]`.
+/// `--self-test [<report.json>] [--pause <seconds>]`.
 nonisolated struct SelfTestOptions: Sendable, Equatable {
     static let defaultReportPath = "~/Library/Logs/BetterTab/self-test.json"
-    /// A longer hold during Picking would run into the tap's 15 s no-input timeout.
+    /// Checkpoints can hold with ⌘ down, so they're kept short.
     static let maxPause: Double = 10
 
     var reportPath: String
-    var long = false
     var pauseSeconds: Double = 0
     /// Launched with the argument: quit when done. From the menu: keep running.
     var quitWhenDone = true
@@ -19,10 +18,8 @@ nonisolated struct SelfTestOptions: Sendable, Equatable {
 
     static let fromMenu = SelfTestOptions(reportPath: defaultReportPath, quitWhenDone: false, trigger: "menu")
 
-    init(reportPath: String, long: Bool = false, pauseSeconds: Double = 0, quitWhenDone: Bool = true,
-         trigger: String = "launch argument") {
+    init(reportPath: String, pauseSeconds: Double = 0, quitWhenDone: Bool = true, trigger: String = "launch argument") {
         self.reportPath = reportPath
-        self.long = long
         self.pauseSeconds = pauseSeconds
         self.quitWhenDone = quitWhenDone
         self.trigger = trigger
@@ -37,7 +34,6 @@ nonisolated struct SelfTestOptions: Sendable, Equatable {
         } else {
             reportPath = Self.defaultReportPath
         }
-        long = arguments.contains("--long")
         if let pause = arguments.firstIndex(of: "--pause"), pause + 1 < arguments.endIndex,
            let seconds = Double(arguments[pause + 1]), seconds > 0 {
             pauseSeconds = min(seconds, Self.maxPause)
@@ -61,55 +57,37 @@ nonisolated struct SelfTestCandidate: Sendable, Equatable {
 }
 
 nonisolated struct SelfTestTargets: Sendable, Equatable {
-    /// Where every scenario starts: the origin app, unless it's the only multi-window app.
+    /// Where every scenario starts, and the app ⌘§ is tested on: the origin app.
     var home: Int32?
-    /// The app with the most windows (≥ 2).
+    /// Another app with two or more windows, the most of them.
     var multi: Int32?
     /// An app with exactly one window.
     var single: Int32?
-    /// Another app with ≥ 2 windows.
-    var second: Int32?
     var notes: [String] = []
 }
 
 nonisolated enum SelfTestPlan {
-    /// `origin` is the app in front when the run starts (nil if it isn't a regular app).
+    /// `origin` is the app in front when the run starts (nil if it isn't a regular app). It stays
+    /// home, since the ⌘§ scenarios need home to have two or more windows and it's the app the
+    /// maintainer set up for them.
     static func pickTargets(_ apps: [SelfTestCandidate], origin: Int32?) -> SelfTestTargets {
         let byWindows = apps.sorted { $0.windows != $1.windows ? $0.windows > $1.windows : $0.bundleID < $1.bundleID }
         let multis = byWindows.filter { $0.windows >= 2 }
         let singles = byWindows.filter { $0.windows == 1 }
         var targets = SelfTestTargets()
         var home = origin.flatMap { pid in apps.contains { $0.pid == pid } ? pid : nil }
-
-        if let best = multis.first(where: { $0.pid != home }) {
-            targets.multi = best.pid
-        } else if let only = multis.first {
-            // The origin is the only app with two or more windows: test it from somewhere else.
-            targets.multi = only.pid
-            home = nil
-            targets.notes.append("the origin app is the only multi-window app, so another app is home")
-        }
-        targets.second = multis.first { $0.pid != home && $0.pid != targets.multi }?.pid
-
-        let taken = { (pid: Int32) in pid == targets.multi || pid == targets.second }
         if home == nil {
             // Keep one single-window app free for its own scenario.
-            let others = byWindows.filter { !taken($0.pid) }
-            let spareSingles = singles.filter { !taken($0.pid) }
-            home = others.first { $0.windows >= 2 }?.pid
-                ?? (spareSingles.count >= 2 ? spareSingles.last?.pid : nil)
-                ?? others.first { $0.windows == 0 }?.pid
-                ?? spareSingles.first?.pid
-            if home == nil, let second = targets.second {
-                home = second
-                targets.second = nil
-                targets.notes.append("no other app to start from, so the second multi-window app is home")
-            }
+            home = multis.first?.pid
+                ?? (singles.count >= 2 ? singles.last?.pid : nil)
+                ?? byWindows.first { $0.windows == 0 }?.pid
+                ?? singles.first?.pid
         }
         targets.home = home
-        targets.single = singles.first { $0.pid != home && !taken($0.pid) }?.pid
-        if let multi = targets.multi, let app = apps.first(where: { $0.pid == multi }), app.windows < 3 {
-            targets.notes.append("multi has only \(app.windows) windows, so arrows-return is skipped")
+        targets.multi = multis.first { $0.pid != home }?.pid
+        targets.single = singles.first { $0.pid != home }?.pid
+        if let home, let app = apps.first(where: { $0.pid == home }), app.windows < 2 {
+            targets.notes.append("home has only \(app.windows) windows, so the ⌘§ scenarios are skipped")
         }
         return targets
     }
@@ -173,7 +151,6 @@ nonisolated struct SelfTestTargetReport: Codable, Sendable, Equatable {
 
 nonisolated struct SelfTestReport: Codable, Sendable {
     struct Options: Codable, Sendable {
-        var long: Bool
         var pauseSeconds: Double
         var trigger: String
     }

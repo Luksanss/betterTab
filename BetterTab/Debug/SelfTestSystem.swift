@@ -267,11 +267,7 @@ nonisolated enum SelfTestAX {
 nonisolated final class SelfTestKeys: Sendable {
     static let tab: CGKeyCode = 48
     static let escape: CGKeyCode = 53
-    static let returnKey: CGKeyCode = 36
     static let command: CGKeyCode = 55
-    static let downArrow: CGKeyCode = 125
-    static let letterA: CGKeyCode = 0
-    static let letterS: CGKeyCode = 1
     /// `kVK_ISO_Section`, the § key above Tab on ISO keyboards.
     static let section: CGKeyCode = 10
 
@@ -467,14 +463,6 @@ nonisolated func selfTestEmergencyRelease(keys: SelfTestKeys, dockPid: Int32?) -
         Thread.sleep(forTimeInterval: 0.04)
         keys.commandUp()
         actions.append("⌘ up")
-        Thread.sleep(forTimeInterval: 0.2)
-    }
-    if switcherUp() {
-        // Held open with ⌘ released: a ⌘ press and release ends Picking in the tap itself.
-        keys.commandDown()
-        Thread.sleep(forTimeInterval: 0.04)
-        keys.commandUp()
-        actions.append("⌘ tap")
         Thread.sleep(forTimeInterval: 0.2)
     }
     let state = SelfTestKeys.commandState()

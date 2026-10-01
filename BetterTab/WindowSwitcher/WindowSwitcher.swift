@@ -27,7 +27,7 @@ final class WindowSwitcher {
     private var restingPointer: NSPoint?
 
     init() {
-        // Unlike the window list, there's no native switcher underneath for a click to end.
+        // Unlike the stack edges, it isn't over the native switcher, which any click would close.
         panel.ignoresMouseEvents = false
         panel.hasShadow = true
         panel.contentView = NSView()

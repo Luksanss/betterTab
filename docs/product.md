@@ -1,8 +1,9 @@
 # BetterTab: product
 
-Working name, taken from the repo. A macOS menu-bar utility: a ⌘⇥ switcher that looks and feels
-like the native one, but lets you pick a specific window when the app you land on has more than
-one open. Written 2026-09-29, before the build.
+Working name, taken from the repo. A macOS menu-bar utility that gets you to the right window:
+⌘§ switches between the front app's windows the way ⌘⇥ switches between apps, and the native ⌘⇥
+switcher shows which apps have more than one window. Written 2026-09-29, before the build, and
+revised on 2026-10-01, when the window list on ⌘⇥ was dropped.
 
 ## The problem
 
@@ -29,10 +30,10 @@ What macOS already offers, and why it falls short:
 | [WindowLens](https://github.com/FornaxChemica/WindowLens) (free, MIT, macOS 26+) | Window switcher plus native ⌘⇥ previews, built the same way as DockDoor | Also preview-first, and also asks for Screen Recording |
 
 **Verdict (revised 2026-09-29).** DockDoor and WindowLens already add a window picker on top of
-the native ⌘⇥, which is the core of this idea. The maintainer has ruled DockDoor out as far too
+the native ⌘⇥, which was the core of the first idea. The maintainer has ruled DockDoor out as far too
 bloated. **Being minimal is BetterTab's whole reason to exist:**
 - a single-purpose app, with nothing else attached;
-- window titles instead of thumbnails, so Accessibility is the only permission;
+- window outlines and titles instead of thumbnails, so Accessibility is the only permission;
 - one home-row letter per window, instead of hunting for it.
 
 Any feature beyond `docs/spec.md` needs a reason. "DockDoor has it" is not a reason.
@@ -40,25 +41,19 @@ Any feature beyond `docs/spec.md` needs a reason. "DockDoor has it" is not a rea
 Worth building for personal use. As a business it's weak: two free apps are within a feature or
 two of it.
 
-The idea is simple. The platform makes one part hard: releasing ⌘ on the native switcher
-switches straight away, and this flow needs it to wait. `docs/architecture.md` tries a trick first
-(hiding the ⌘ release from macOS so its switcher stays open). If the trick fails, BetterTab draws
-its own switcher. Either way, focusing the right window reliably is the other hard part. The window
-list itself is the easy part.
+The first version had one hard part the platform imposed: releasing ⌘ on the native switcher
+switches straight away, and its window list needed it to wait. BetterTab hid the ⌘ release from
+macOS so the switcher stayed open (`docs/architecture.md` § Route A+, removed). That's gone now.
+What's still hard is focusing the right window reliably, especially on another Space.
 
-## The interaction (decided 2026-09-29)
+## The interaction
 
-Press ⌘⇥ as usual. Apps with more than one window show the edges of more windows stacked behind
-their icon. Release on a single-window app and it switches natively. Release on an app with two or more windows and
-nothing switches yet: the switcher stays, and a list of that app's windows opens above its icon,
-each with a home-row letter (A S D …). Press a letter to go to that window, or Esc to stay where
-you were. Exact behaviour is in `docs/spec.md`.
-
-**Why pick after release, not while holding ⌘.** Holding was considered: the window row would
-show while ⌘ is still held, and releasing would confirm the most recent window. The maintainer
-chose picking after release. The list only appears for apps with more than one window, so
-choosing is an expected step, not a surprise. The stack edges show beforehand which apps will ask.
-The accepted cost is one key press (A) even when the most recent window is the one you want.
+**First, a window list on ⌘⇥ (2026-09-29).** Press ⌘⇥ as usual; apps with more than one window
+show the edges of more windows stacked behind their icon. Release on one of those, and nothing
+switched yet: the switcher stayed, and a list of that app's windows opened above its icon, each
+with a home-row letter. Picking after release won over picking while holding ⌘, because the list
+appeared only for apps with more than one window, and the stack edges said beforehand which apps
+would ask.
 
 **⌘§ for the app you're in (added 2026-09-30).** In daily use the maintainer found that the app
 you're already in is the one ⌘⇥ makes hardest to reach: another Chrome window meant cycling
@@ -67,6 +62,13 @@ app's windows: hold ⌘, § steps, releasing opens, and a quick tap flips to the
 fixes what ⌘` lacks: you see where you're going, and it reaches full-screen windows and other
 Spaces. Each tile draws the window's outline on its display, because pictures would need Screen
 Recording. The maintainer chose these outlines from three Claude Design directions.
+
+**Then, native ⌘⇥ again (2026-10-01).** In daily use the list cost more than it saved: every ⌘⇥
+onto an app with several windows became a decision about which one. Native ⌘⇥ needs no thought,
+and when it lands on the wrong window, ⌘§ fixes it in a tap; the maintainer said ⌘§ "works super
+well" for exactly that. So the list went, and ⌘⇥ is native. The stack edges stayed: they still
+show which apps have more than one window, which is when ⌘§ has somewhere to go. Exact behaviour
+is in `docs/spec.md`.
 
 ## Scope
 

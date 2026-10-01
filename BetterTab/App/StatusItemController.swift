@@ -111,14 +111,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     #if DEBUG
     private func makeDebugItem() -> NSMenuItem {
-        let preview = NSMenu()
-        for scenario in PreviewScenario.allCases {
-            let item = NSMenuItem(title: scenario.title, action: #selector(showPreview(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = scenario.rawValue
-            preview.addItem(item)
-        }
-
         let status = NSMenu()
         debugStateItems = debugStates.enumerated().map { index, entry in
             let item = NSMenuItem(title: entry.title, action: #selector(forceState(_:)), keyEquivalent: "")
@@ -129,7 +121,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
 
         let debug = NSMenu()
-        debug.addItem(withTitle: "Preview", action: nil, keyEquivalent: "").submenu = preview
+        let preview = NSMenuItem(title: "Preview Stack Edges", action: #selector(showPreview), keyEquivalent: "")
+        preview.target = self
+        debug.addItem(preview)
         debug.addItem(withTitle: "Status", action: nil, keyEquivalent: "").submenu = status
         debug.addItem(.separator())
         let selfTest = NSMenuItem(title: "Run Self-Test", action: #selector(runSelfTestItem), keyEquivalent: "")
@@ -141,9 +135,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return item
     }
 
-    @objc private func showPreview(_ sender: NSMenuItem) {
-        guard let scenario = PreviewScenario(rawValue: sender.tag) else { return }
-        DesignPreview.shared.show(scenario)
+    @objc private func showPreview() {
+        DesignPreview.shared.show()
     }
 
     @objc private func forceState(_ sender: NSMenuItem) {
@@ -156,8 +149,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let alert = NSAlert()
         alert.messageText = "Run the self-test?"
         alert.informativeText = """
-            For about two minutes BetterTab presses ⌘⇥, letters and Esc itself and switches \
-            between windows and Spaces. Don't touch the keyboard or mouse while it runs; a click \
+            For about a minute BetterTab presses ⌘⇥, ⌘§ and Esc itself and switches between \
+            apps, windows and Spaces. Don't touch the keyboard or mouse while it runs; a click \
             stops it. The report goes to ~/Library/Logs/BetterTab/self-test.json.
             """
         alert.addButton(withTitle: "Run")

@@ -1,8 +1,8 @@
 #if DEBUG
 import AppKit
 
-// ⌘§, mapped to docs/spec.md § Acceptance tests 22–25. Each starts from the home app, which needs
-// two or more windows: scratch TextEdit documents are the safe choice, as for ⌘⇥.
+// ⌘§, mapped to docs/spec.md § Acceptance tests 5, 6 and 8. Each starts from the home app, which
+// needs two or more windows: scratch TextEdit documents are the safe choice.
 
 extension SelfTest {
     func runWindowScenarios() async throws {
@@ -16,7 +16,7 @@ extension SelfTest {
         }
     }
 
-    // MARK: 22. A quick ⌘§ flips, and flips back
+    // MARK: 5. A quick ⌘§ flips, and flips back
 
     private func windowsFlip(_ run: ScenarioRun) async throws {
         guard let home, try await restoreHome(run), keysAllowed(run) else { return }
@@ -67,7 +67,7 @@ extension SelfTest {
         return expected
     }
 
-    // MARK: 25. Esc changes nothing
+    // MARK: 8. Esc changes nothing
 
     private func windowsEscape(_ run: ScenarioRun) async throws {
         guard let home, try await restoreHome(run), keysAllowed(run) else { return }
@@ -90,7 +90,7 @@ extension SelfTest {
         try await checkCommandUp(run)
     }
 
-    // MARK: 23. Holding ⌘ and stepping
+    // MARK: 6. Holding ⌘ and stepping
 
     private func windowsCycle(_ run: ScenarioRun) async throws {
         guard let home, try await restoreHome(run), keysAllowed(run) else { return }

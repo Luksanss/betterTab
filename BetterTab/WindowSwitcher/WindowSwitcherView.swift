@@ -152,8 +152,22 @@ final class WindowSwitcherView: NSView {
         view.material = .hudWindow
         view.blendingMode = .behindWindow
         view.state = .active
-        view.maskImage = WindowListView.roundedMask(radius: cornerRadius)
+        view.maskImage = roundedMask(radius: cornerRadius)
         return view
+    }
+
+    /// A stretchable rounded rect. For behind-window blending, a mask image is what clips the blur
+    /// and gives the window shadow its shape.
+    static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 }
 
@@ -417,4 +431,42 @@ final class WindowSwitcherOverflowView: NSView {
 
 private extension NSAppearance {
     var isDark: Bool { bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
+}
+
+/// A window with a bar along its bottom: the minimized marker, drawn in the label colour, or white
+/// when highlighted.
+final class MinimizedGlyphView: NSView {
+    var isHighlighted = false {
+        didSet { if isHighlighted != oldValue { needsDisplay = true } }
+    }
+
+    init() {
+        super.init(frame: NSRect(x: 0, y: 0, width: 13, height: 10))
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        setAccessibilityLabel("Minimized")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override var isFlipped: Bool { true }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let stroke: CGFloat = 1.3
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current?.cgContext.setAlpha(0.7)
+        (isHighlighted ? NSColor.white : .labelColor).set()
+
+        let outline = NSBezierPath(roundedRect: bounds.insetBy(dx: stroke / 2, dy: stroke / 2), xRadius: 2.5, yRadius: 2.5)
+        outline.lineWidth = stroke
+        outline.stroke()
+        NSBezierPath(rect: NSRect(x: 2, y: bounds.height - 1.5 - stroke, width: bounds.width - 4, height: stroke)).fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
 }
