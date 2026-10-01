@@ -3,49 +3,23 @@ import AppKit
 import Carbon.HIToolbox
 import UniformTypeIdentifiers
 
-/// The v5 design's scenarios, for checking the stack edges and the window list by eye. Debug
-/// builds only.
-enum PreviewScenario: Int, CaseIterable {
-    case chrome3, terminal2, notes1, minimized, eleven, untitledAndDuplicates, longTitle
-
-    var title: String {
-        switch self {
-        case .chrome3: "Chrome ×3"
-        case .terminal2: "Terminal ×2"
-        case .notes1: "Notes ×1 (no list)"
-        case .minimized: "One minimized window"
-        case .eleven: "Finder ×11 (+2 more)"
-        case .untitledAndDuplicates: "Untitled + duplicate titles"
-        case .longTitle: "Very long title"
-        }
-    }
-}
-
-/// Shows the stack edges and the window list over a stand-in switcher.
+/// The stack edges over a stand-in switcher, for checking them by eye. Debug builds only.
 ///
-/// The real `StackEdgesOverlay` and `WindowList` are laid over the stand-in's icon frames, the way
-/// the controller lays them over the native switcher's AX frames. Keys work as in Picking: letters,
-/// arrows and Return pick, Esc closes, and Tab moves on to the next app as ⌘⇥ followed by a release
-/// would.
+/// The real `StackEdgesOverlay` is laid over the stand-in's icon frames, the way the controller lays
+/// it over the native switcher's AX frames. Tab moves the highlight on, and Esc closes.
 final class DesignPreview {
     static let shared = DesignPreview()
 
     private let switcher = StandInSwitcher()
     private let stackEdges = StackEdgesOverlay()
-    private let list = WindowList(acceptsMouse: true)
-    private var apps: [PreviewApp] = []
     private var highlighted = 0
     private var keyMonitor: Any?
     private var resignObserver: NSObjectProtocol?
 
-    init() {
-        list.onPick = { [weak self] index in self?.picked(index) }
-    }
-
-    func show(_ scenario: PreviewScenario) {
+    func show() {
         tearDown()
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        apps = PreviewApp.apps(for: scenario)
+        let apps = PreviewApp.standard
         // As after one ⌘⇥ from Slack.
         highlighted = 1
 
@@ -54,8 +28,7 @@ final class DesignPreview {
         NSApp.activate()
         switcher.show(apps: apps.map { ($0.name, $0.icon) }, highlighted: highlighted, on: screen)
         stackEdges.show(switcherFrame: switcher.frame,
-                  icons: zip(switcher.iconFrames, apps).map { (frame: $0, windowCount: $1.windows.count) })
-        openList()
+                        icons: zip(switcher.iconFrames, apps).map { (frame: $0, windowCount: $1.windows) })
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
@@ -81,7 +54,6 @@ final class DesignPreview {
         keyMonitor = nil
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
-        list.hide()
         stackEdges.hide()
         switcher.hide()
     }
@@ -90,41 +62,14 @@ final class DesignPreview {
         if event.modifierFlags.contains(.command) { return event }
         switch Int(event.keyCode) {
         case kVK_Tab:
-            advance()
-        case kVK_Escape where !list.isVisible:
+            highlighted = (highlighted + 1) % PreviewApp.standard.count
+            switcher.setHighlighted(highlighted)
+        case kVK_Escape:
             close()
         default:
-            // Everything else is swallowed, as the key tap will in Picking.
-            guard list.isVisible, let action = list.handle(keyCode: event.keyCode) else { break }
-            switch action {
-            case .pick(let index): picked(index)
-            case .cancel: close()
-            case .moveHighlight: break
-            }
+            break
         }
         return nil
-    }
-
-    private func advance() {
-        list.hide()
-        highlighted = (highlighted + 1) % apps.count
-        switcher.setHighlighted(highlighted)
-        openList()
-    }
-
-    private func openList() {
-        let app = apps[highlighted]
-        guard app.windows.count >= 2, let screen = switcher.screen else { return }
-        list.show(windows: app.windows, switcherFrame: switcher.frame,
-                  iconFrame: switcher.iconFrames[highlighted], screen: screen)
-    }
-
-    private func picked(_ windowIndex: Int) {
-        let row = list.model.rows.firstIndex { $0.windowIndex == windowIndex } ?? 0
-        let letter = list.labels.indices.contains(row) ? list.labels[row] : "?"
-        let app = apps[highlighted]
-        print("DesignPreview: picked \(letter), row \(row + 1): window \(windowIndex + 1) of \(app.windows.count) in \(app.name)")
-        close()
     }
 }
 
@@ -133,7 +78,8 @@ final class DesignPreview {
 private struct PreviewApp {
     let name: String
     let bundleID: String
-    var windows: [WindowListItem]
+    /// Windows on every Space, as the stack edges count them.
+    let windows: Int
 
     var icon: NSImage {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
@@ -142,72 +88,19 @@ private struct PreviewApp {
         return NSWorkspace.shared.icon(forFile: url.path(percentEncoded: false))
     }
 
-    private static let chrome = "com.google.Chrome"
-    private static let terminal = "com.apple.Terminal"
-    private static let code = "com.microsoft.VSCode"
-    private static let finder = "com.apple.finder"
-    private static let notes = "com.apple.Notes"
-
-    private static let chromeTitles = [
-        "Inbox (24) - Gmail",
-        "Add window list above switcher by jdoe · Pull Request #412 · example/bettertab",
-        "Apple Developer Documentation",
+    /// No edges, two, one, one, two (for eleven windows), then none.
+    static let standard: [PreviewApp] = [
+        PreviewApp(name: "Slack", bundleID: "com.tinyspeck.slackmacgap", windows: 1),
+        PreviewApp(name: "Google Chrome", bundleID: "com.google.Chrome", windows: 3),
+        PreviewApp(name: "Terminal", bundleID: "com.apple.Terminal", windows: 2),
+        PreviewApp(name: "Visual Studio Code", bundleID: "com.microsoft.VSCode", windows: 2),
+        PreviewApp(name: "Finder", bundleID: "com.apple.finder", windows: 11),
+        PreviewApp(name: "Notes", bundleID: "com.apple.Notes", windows: 1),
+        PreviewApp(name: "Claude", bundleID: "com.anthropic.claudefordesktop", windows: 1),
+        PreviewApp(name: "Calendar", bundleID: "com.apple.iCal", windows: 1),
+        PreviewApp(name: "Photos", bundleID: "com.apple.Photos", windows: 1),
+        PreviewApp(name: "System Settings", bundleID: "com.apple.systempreferences", windows: 1),
     ]
-
-    private static let standard: [PreviewApp] = [
-        PreviewApp(name: "Slack", bundleID: "com.tinyspeck.slackmacgap", windows: titled("Slack")),
-        PreviewApp(name: "Google Chrome", bundleID: chrome, windows: titled(chromeTitles)),
-        PreviewApp(name: "Terminal", bundleID: terminal,
-                   windows: titled("jdoe — -zsh — 120×40", "bettertab — swift build — 120×40")),
-        PreviewApp(name: "Visual Studio Code", bundleID: code,
-                   windows: titled("WindowList.swift — bettertab", "README.md — dotfiles")),
-        PreviewApp(name: "Finder", bundleID: finder, windows: titled("Downloads", "Projects")),
-        PreviewApp(name: "Notes", bundleID: notes, windows: titled("Notes")),
-        PreviewApp(name: "Claude", bundleID: "com.anthropic.claudefordesktop", windows: titled("Claude")),
-        PreviewApp(name: "Calendar", bundleID: "com.apple.iCal", windows: titled("Calendar")),
-        PreviewApp(name: "Photos", bundleID: "com.apple.Photos", windows: titled("Photos")),
-        PreviewApp(name: "System Settings", bundleID: "com.apple.systempreferences", windows: titled("System Settings")),
-    ]
-
-    /// Slack first, then the scenario's app with its windows, then the rest.
-    static func apps(for scenario: PreviewScenario) -> [PreviewApp] {
-        let (bundleID, windows) = target(of: scenario)
-        var apps = standard
-        guard let index = apps.firstIndex(where: { $0.bundleID == bundleID }) else { return apps }
-        var app = apps.remove(at: index)
-        app.windows = windows
-        apps.insert(app, at: 1)
-        return apps
-    }
-
-    private static func target(of scenario: PreviewScenario) -> (bundleID: String, windows: [WindowListItem]) {
-        switch scenario {
-        case .chrome3:
-            (chrome, titled(chromeTitles))
-        case .terminal2:
-            (terminal, titled("jdoe — -zsh — 120×40", "bettertab — swift build — 120×40"))
-        case .notes1:
-            (notes, titled("Notes"))
-        case .minimized:
-            (code, titled("WindowList.swift — bettertab", "README.md — dotfiles")
-                + [WindowListItem(title: "App.tsx — website", isMinimized: true)])
-        case .eleven:
-            (finder, titled("Downloads", "Projects", "bettertab", "Screenshots", "Desktop", "Documents",
-                          "Invoices 2026", "Design Assets", "Applications", "website", "Recents"))
-        case .untitledAndDuplicates:
-            (chrome, titled("New Tab", "New Tab", "", "Inbox (24) - Gmail"))
-        case .longTitle:
-            (chrome, titled("Window-level switching for the ⌘⇥ app switcher without replacing it: open questions, "
-                              + "edge cases and rollout plan · Issue #1287 · example/bettertab",
-                          "Inbox (24) - Gmail"))
-        }
-    }
-
-    private static func titled(_ titles: String...) -> [WindowListItem] { titled(titles) }
-
-    private static func titled(_ titles: [String]) -> [WindowListItem] {
-        titles.map { WindowListItem(title: $0, isMinimized: false) }
-    }
 }
 
 // MARK: - Stand-in switcher
@@ -271,7 +164,7 @@ private final class StandInSwitcher {
                              y: (screen.frame.midY - size.height / 2).rounded())
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
         background.frame = NSRect(origin: .zero, size: size)
-        background.maskImage = WindowListView.roundedMask(radius: Self.cornerRadius)
+        background.maskImage = WindowSwitcherView.roundedMask(radius: Self.cornerRadius)
 
         setHighlighted(highlighted)
         panel.makeKeyAndOrderFront(nil)

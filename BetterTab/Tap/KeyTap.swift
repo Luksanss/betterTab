@@ -7,19 +7,12 @@ import os
 
 /// What the tap tells the controller. Delivered on the main queue.
 nonisolated enum TapEvent: Sendable {
-    /// ⌘⇥ was pressed and passed on: the native switcher is opening. `holdOnRelease` is cleared.
+    /// ⌘⇥ was pressed and passed on: the native switcher is opening.
     case cycleStarted
-    /// Cycling ended with no hold: ⌘ released natively, a native Esc, or a missed release.
+    /// Cycling ended: ⌘ released, a native Esc, a missed release, or the tap stopping.
     case cycleEnded
-    /// ⌘ was released with `holdOnRelease` set. The release was swallowed; the switcher is held.
-    case pickingStarted
-    /// A keyDown during Picking or Windows, swallowed. Autorepeats come only for the arrows.
+    /// A keyDown during Windows, swallowed. Autorepeats come only for the arrows.
     case key(UInt16)
-    /// ⌘⇥ during Picking. The Tab went to the Dock, which moved its highlight on. The ⌘ release is
-    /// still owed and carries over.
-    case backToCycling
-    /// Picking ended; what it owed has been posted.
-    case pickingEnded(TapEndReason)
     /// ⌘§ was pressed and swallowed: the window switcher for the front app opens. Shift steps
     /// backwards, as in ⌘⇧⇥.
     case windowsStarted(backwards: Bool)
@@ -33,38 +26,20 @@ nonisolated enum TapEvent: Sendable {
 nonisolated struct TapMessage: Sendable {
     let event: TapEvent
     /// The tap's generation once the event happened. Every phase change raises it, so a late
-    /// message can be told apart. During Picking it names the session to pass to `endHold`.
+    /// message can be told apart. During Windows it names the session to pass to `endWindows`.
     let generation: UInt64
 }
 
-/// How `endHold` lets the Dock go.
-nonisolated enum HoldEnd: String, Sendable {
-    /// The ⌘ release only: the Dock finishes the native switch to the highlighted app.
-    case confirm
-    /// Esc down and up with ⌘, then the ⌘ release: the Dock cancels, and the front app stays.
-    case cancel
-    /// The ⌘ release only, because the switcher has gone already. Esc would reach the front app.
-    case releaseOnly
-}
-
 nonisolated enum TapEndReason: String, Sendable {
-    /// The controller called `endHold`.
-    case requested
-    /// Spec: 15 s with no key pressed.
-    case timeout
-    /// ⌘ pressed and released during Picking, with no Tab.
-    case commandTapped
     /// macOS turned the tap off, so events may have gone past it.
     case tapDisabled
-    /// `stop()`: quit, a signal, or the permission going away.
+    /// `stop()`: quit, or the permission going away.
     case stopped
-    /// Cycling saw ⌘ up without seeing its release.
-    case missedRelease
 }
 
-/// The product key tap: holds the native ⌘⇥ switcher open when ⌘ is released on an app with two
-/// or more windows, and feeds the keys pressed meanwhile to the controller. Every way out of a
-/// hold posts exactly one synthetic ⌘ release. Sendable, so the signal handlers can stop it.
+/// The product key tap. It watches ⌘⇥ pass by, so the stack edges can be drawn over the native
+/// switcher, and runs ⌘§, swallowing § and the keys pressed while its switcher is open. It never
+/// swallows ⌘, so macOS is never owed a ⌘ release. Sendable, so any thread can stop it.
 nonisolated final class KeyTap: Sendable {
     private let machine: TapMachine
     private let current = Mutex<TapThread?>(nil)
@@ -73,13 +48,6 @@ nonisolated final class KeyTap: Sendable {
         machine = TapMachine { message in
             DispatchQueue.main.async { MainActor.assumeIsolated { deliver(message) } }
         }
-    }
-
-    /// Whether releasing ⌘ now holds the switcher. Main sets it whenever the highlighted app or
-    /// its window count changes; the tap clears it at every ⌘⇥ that starts a cycle.
-    var holdOnRelease: Bool {
-        get { machine.holdOnRelease }
-        set { machine.holdOnRelease = newValue }
     }
 
     /// Creates the tap on its own thread, unless one exists already.
@@ -95,26 +63,19 @@ nonisolated final class KeyTap: Sendable {
         tap.start()
     }
 
-    /// Any thread. The tap goes off first and the owed release is posted second, so no new hold
-    /// can start in between.
+    /// Any thread. The tap goes off first, so nothing new can start, and then whatever was running
+    /// ends.
     func stop() {
         let old = current.withLock { current -> TapThread? in
             defer { current = nil }
             return current
         }
         old?.stop()
-        machine.end(.cancel, reason: .stopped)
+        machine.end(reason: .stopped)
     }
 
-    /// Main actor. Ends Picking session `session` (the generation of its `.pickingStarted`) and
-    /// posts what `how` says. Idempotent: returns false, posting nothing, once that session is over.
-    @discardableResult
-    func endHold(_ how: HoldEnd, session: UInt64) -> Bool {
-        machine.endHold(how, session: session)
-    }
-
-    /// Main actor. Ends Windows session `session` (the generation of its `.windowsStarted`). Posts
-    /// nothing, since the window switcher holds nothing back. False once that session is over.
+    /// Main actor. Ends Windows session `session` (the generation of its `.windowsStarted`). False
+    /// once that session is over.
     @discardableResult
     func endWindows(session: UInt64) -> Bool {
         machine.endWindows(session: session)
@@ -139,7 +100,7 @@ nonisolated private func keyTapCallback(
 }
 
 /// One session-level event tap on a dedicated thread with its own run loop, so AX work, logging
-/// or a busy main thread can never delay the callback. Ported from Experiment/EventTap.swift.
+/// or a busy main thread can never delay the callback.
 nonisolated private final class TapThread: Sendable {
     private let machine: TapMachine
     private let port = Mutex<PortRef?>(nil)
@@ -167,7 +128,7 @@ nonisolated private final class TapThread: Sendable {
             eventsOfInterest: Self.mask, callback: keyTapCallback,
             userInfo: Unmanaged.passUnretained(self).toOpaque())
         else {
-            TapLog.logger.error("tapCreate returned nil: no key tap, so ⌘⇥ stays native")
+            TapLog.logger.error("tapCreate returned nil: no key tap, so no stack edges and no ⌘§")
             finished.signal()
             return
         }
@@ -185,10 +146,10 @@ nonisolated private final class TapThread: Sendable {
         while !control.withLock({ $0.stopRequested }) {
             if CFRunLoopRunInMode(.defaultMode, 1.0e10, false) == .finished {
                 // The tap's port went away underneath us (macOS can invalidate it), so the run
-                // loop has no source left and would return at once, forever. Nothing drives a
-                // hold any more: cancel it.
+                // loop has no source left and would return at once, forever. End whatever was
+                // running.
                 TapLog.logger.error("Key tap's port is gone; the tap has stopped")
-                machine.end(.cancel, reason: .tapDisabled)
+                machine.end(reason: .tapDisabled)
                 break
             }
         }
@@ -238,21 +199,16 @@ nonisolated private final class TapThread: Sendable {
             machine.tapWasDisabled()
             return Unmanaged.passUnretained(event)
         }
-        if SyntheticKeys.isOurs(event) { return Unmanaged.passUnretained(event) }
         guard let kind = TapInputKind(type) else { return Unmanaged.passUnretained(event) }
 
         let input = TapInput(
             kind: kind,
             keycode: event.getIntegerValueField(.keyboardEventKeycode),
             flags: event.flags,
-            autorepeat: kind == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0,
-            now: continuousNanos())
+            autorepeat: kind == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
 
         switch machine.process(input) {
         case .pass:
-            return Unmanaged.passUnretained(event)
-        case .passAddingCommand(let keycode):
-            event.flags = SyntheticKeys.withCommand(event.flags, keycode: keycode)
             return Unmanaged.passUnretained(event)
         case .swallow:
             return nil

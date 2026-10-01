@@ -30,7 +30,7 @@ nonisolated enum AXPrivate {
     }
 }
 
-/// Where an app's element-id scan has got to. Kept for the process lifetime, so each ⌘⇥ carries
+/// Where an app's element-id scan has got to. Kept for the process lifetime, so each load carries
 /// on from the last.
 nonisolated struct ScanProgress: Sendable {
     var cursor: UInt64 = 0

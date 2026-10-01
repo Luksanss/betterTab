@@ -8,20 +8,21 @@ struct SelfTestWeak<Object: AnyObject> {
     weak var object: Object?
 }
 
-/// Drives the real ⌘⇥ flow with synthetic keys and writes a pass/fail report. Debug builds only.
+/// Drives native ⌘⇥ under the stack edges, and ⌘§, with synthetic keys, and writes a pass/fail
+/// report. Debug builds only.
 ///
-/// Start it with `--self-test <report.json>` (plus `--long` for the 15 s timeout, `--pause <s>` to
-/// hold at checkpoints) or from Debug › Run Self-Test. Keyboard only. Letters, arrows and Return
-/// are posted only while the list is open, so they can't reach a real app.
+/// Start it with `--self-test <report.json>` (plus `--pause <s>` to hold at checkpoints) or from
+/// Debug › Run Self-Test. Keyboard only. Esc is posted only with ⌘ held, so it reaches the Dock or
+/// the ⌘§ switcher, never a real app.
 final class SelfTest {
     private static var running: SelfTest?
 
-    static func start(_ options: SelfTestOptions, tap: KeyTap) {
+    static func start(_ options: SelfTestOptions) {
         guard running == nil else {
             selfTestLog.notice("a self-test is already running")
             return
         }
-        let test = SelfTest(options: options, tap: tap)
+        let test = SelfTest(options: options)
         running = test
         Task {
             await test.run()
@@ -37,7 +38,6 @@ final class SelfTest {
     }
 
     let options: SelfTestOptions
-    let tap: KeyTap
     let keys = SelfTestKeys()
     let recorder: SelfTestRecorder
     let dockPid: Int32?
@@ -57,17 +57,14 @@ final class SelfTest {
     private var clickSeen = false
     /// Set while `clean` runs, so no stop can cut it off between a ⌘ down and its ⌘ up.
     private var cleaning = false
-    /// When the last release that opened a list was posted.
-    var lastReleaseAt: ContinuousClock.Instant?
 
-    private init(options: SelfTestOptions, tap: KeyTap) {
+    private init(options: SelfTestOptions) {
         self.options = options
-        self.tap = tap
         dockPid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.processIdentifier
         let report = SelfTestReport(
             macOS: ProcessInfo.processInfo.operatingSystemVersionString,
             startedAt: Date().ISO8601Format(),
-            options: .init(long: options.long, pauseSeconds: options.pauseSeconds, trigger: options.trigger))
+            options: .init(pauseSeconds: options.pauseSeconds, trigger: options.trigger))
         recorder = SelfTestRecorder(url: options.reportURL(relativeTo: FileManager.default.currentDirectoryPath),
                                     report: report)
     }
@@ -77,7 +74,7 @@ final class SelfTest {
     private func run() async {
         selfTestLog.notice("self-test starting; report at \(self.recorder.url.path, privacy: .public)")
         recorder.update { _ in }
-        let limit: Double = options.long ? 120 : 90
+        let limit: Double = 90
         let watchdog = SelfTestWatchdog(seconds: limit) { [keys, recorder, dockPid, quit = options.quitWhenDone] in
             selfTestLog.error("self-test watchdog fired after \(Int(limit), privacy: .public) s")
             let actions = selfTestEmergencyRelease(keys: keys, dockPid: dockPid)
@@ -85,7 +82,7 @@ final class SelfTest {
             recorder.finish(result: "watchdog", finding: "The run passed its \(Int(limit)) s limit; the watchdog let go of ⌘ and ended it.")
             guard quit else { return }
             DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } }
-            // If the main thread is stuck, SIGTERM stops the key tap (posting any owed ⌘ release) and exits.
+            // If the main thread is stuck, SIGTERM ends the process, and the key tap with it.
             DispatchQueue.global().asyncAfter(deadline: .now() + 3) { kill(getpid(), SIGTERM) }
         }
         self.watchdog = watchdog
@@ -115,11 +112,10 @@ final class SelfTest {
         try await sleep(0.3, nil)
 
         let others = NSWorkspace.shared.runningApplications.filter {
-            $0.processIdentifier != getpid()
-                && ($0.bundleIdentifier == Bundle.main.bundleIdentifier || $0.bundleIdentifier == "com.luksanss.BetterTab.Experiment")
+            $0.processIdentifier != getpid() && $0.bundleIdentifier == Bundle.main.bundleIdentifier
         }
         guard others.isEmpty else {
-            throw Stop.run(result: "aborted", finding: "Another BetterTab or the Experiment harness is running; two key taps would both act on ⌘⇥. Quit it first.")
+            throw Stop.run(result: "aborted", finding: "Another BetterTab is running; two key taps would both act on ⌘§. Quit it first.")
         }
         guard dockPid != nil else { throw Stop.run(result: "aborted", finding: "The Dock isn't running.") }
         guard SelfTestSkyLight.isAvailable else {
@@ -136,7 +132,7 @@ final class SelfTest {
         home = targets.home.flatMap { NSRunningApplication(processIdentifier: $0) }
         let roles: [(String, Int32?)] = [
             ("origin", origin?.processIdentifier), ("home", targets.home), ("multi", targets.multi),
-            ("single", targets.single), ("second", targets.second),
+            ("single", targets.single),
         ]
         let reports = roles.compactMap { role, pid in
             pid.map { SelfTestTargetReport(role: role, bundleID: bundle($0), windows: windowsByPid[$0]?.count ?? 0) }
@@ -268,10 +264,8 @@ final class SelfTest {
                 } catch Stop.scenarioTimeout {
                     run.fail("timed out after \(Int(timeout)) s")
                 }
-                if !run.keepListOpen {
-                    let actions = try await clean(nil)
-                    if !actions.isEmpty { run.note("cleanup: \(actions.joined(separator: ", "))") }
-                }
+                let actions = try await clean(nil)
+                if !actions.isEmpty { run.note("cleanup: \(actions.joined(separator: ", "))") }
             } catch let stop as Stop {
                 if case .run(_, let finding) = stop { run.fail("run stopped: \(finding)") }
                 record(run)
@@ -386,13 +380,6 @@ final class SelfTest {
         if phase != "idle" { sawNonIdlePhase = true }
         return phase
     }
-
-    /// The controller's list: the preview's accepts the mouse, the controller's doesn't.
-    var list: WindowList.DebugState? {
-        WindowList.debugStates.first { !$0.acceptsMouse }
-    }
-
-    var listVisible: Bool { list?.isVisible ?? false }
 
     var stackEdges: StackEdgesOverlay.DebugState? {
         let states = StackEdgesOverlay.debugStates
@@ -525,57 +512,6 @@ final class SelfTest {
         return false
     }
 
-    /// Gives the controller time to read the highlighted app, then waits for it to arm the hold.
-    func holdReady(_ run: ScenarioRun) async throws -> Bool {
-        try await sleep(0.25, run)
-        guard try await waitFor(1.5, run, { self.tap.holdOnRelease }) != nil else {
-            run.fail("holdOnRelease never set: the controller doesn't know the highlighted app has ≥ 2 windows")
-            return false
-        }
-        return true
-    }
-
-    /// Releases ⌘ and waits up to 500 ms for Picking with the list showing `pid`'s windows.
-    func release(expecting pid: Int32, _ run: ScenarioRun) async throws -> (ids: [UInt32], ms: Int)? {
-        lastReleaseAt = .now
-        keys.commandUp()
-        guard let ms = try await waitFor(0.5, every: 0.01, run, { self.phase == "picking" && self.listVisible }) else {
-            let up = await switcher() != nil
-            run.fail("no list within 500 ms of the release (phase \(phase), list visible \(listVisible), switcher up \(up))")
-            return nil
-        }
-        run.check(SelfTestHooks.listedPid == pid,
-                  "the list shows \(bundle(SelfTestHooks.listedPid)), not \(bundle(pid))")
-        return (SelfTestHooks.listedWindowIDs, ms)
-    }
-
-    /// From home: ⌘⇥ to `pid`, wait for the hold to arm, release. Returns the listed window ids
-    /// and how long after the release the list appeared.
-    func openList(on pid: Int32, _ run: ScenarioRun) async throws -> (ids: [UInt32], ms: Int)? {
-        guard try await restoreHome(run),
-              let switcher = try await openSwitcher(run),
-              try await highlight(pid, in: switcher, run),
-              try await holdReady(run),
-              let opened = try await release(expecting: pid, run)
-        else { return nil }
-        run.note("list open \(opened.ms) ms after the release")
-        return opened
-    }
-
-    /// Posts `key` only while the list is open, so it can never reach a real app.
-    func pressInList(_ key: CGKeyCode, _ run: ScenarioRun) -> Bool {
-        guard phase == "picking", listVisible, !keys.isCommandHeld else {
-            run.fail("didn't post a key: the list isn't open (phase \(phase), list visible \(listVisible))")
-            return false
-        }
-        if let reason = Self.screenLockReason() {
-            run.fail("didn't post a key: \(reason)")
-            return false
-        }
-        keys.press(key)
-        return true
-    }
-
     func checkCommandUp(_ run: ScenarioRun) async throws {
         let up = try await waitFor(0.5, run) {
             let state = SelfTestKeys.commandState()
@@ -587,16 +523,8 @@ final class SelfTest {
         }
     }
 
-    /// Waits for the list and the switcher to close and the controller to be idle.
-    func waitForIdle(_ timeout: Double, _ run: ScenarioRun) async throws -> Int? {
-        try await waitFor(timeout, every: 0.01, run) {
-            guard !self.listVisible, self.phase == "idle" else { return false }
-            return await self.switcher() == nil
-        }
-    }
-
-    /// Leaves nothing held: ends Picking or Cycling and makes sure ⌘ is up. Returns what it did.
-    /// The gaps inside a ⌘ tap or an Esc-then-⌘-up can't throw, so a stop never leaves ⌘ down.
+    /// Leaves nothing held: closes ⌘§ or the native switcher and makes sure ⌘ is up. Returns what
+    /// it did. The gap inside an Esc-then-⌘-up can't throw, so a stop never leaves ⌘ down.
     func clean(_ run: ScenarioRun?) async throws -> [String] {
         cleaning = true
         defer { cleaning = false }
@@ -607,26 +535,9 @@ final class SelfTest {
             actions.append("Esc to close ⌘§")
             _ = try await waitFor(1, run) { self.phase != "windows" }
         }
-        var up = await switcher() != nil
-        if phase == "picking" || (up && !keys.isCommandHeld) {
-            // A ⌘ press and release ends Picking in the tap itself, whatever the list shows.
-            if keys.isCommandHeld {
-                keys.commandUp()
-            } else {
-                keys.commandDown()
-                try? await Task.sleep(for: .milliseconds(40))
-                keys.commandUp()
-            }
-            actions.append("⌘ tap to end Picking")
-            _ = try await waitFor(1, run) {
-                guard self.phase != "picking" else { return false }
-                return await self.switcher() == nil
-            }
-            up = await switcher() != nil
-        }
         if keys.isCommandHeld {
             // Cycling: Esc makes the Dock cancel, then ⌘ goes up.
-            if up {
+            if await switcher() != nil {
                 keys.press(SelfTestKeys.escape)
                 actions.append("Esc with ⌘")
                 try? await Task.sleep(for: .milliseconds(40))
@@ -658,8 +569,6 @@ final class ScenarioRun {
     private(set) var failures: [String] = []
     private(set) var skipReason: String?
     var ms: Int?
-    /// list-opens leaves the list up for esc-cancels.
-    var keepListOpen = false
 
     init(name: String, timeout: Double) {
         self.name = name

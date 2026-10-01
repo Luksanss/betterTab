@@ -111,7 +111,7 @@ nonisolated private enum SwitcherTiming {
     static let lookupInterval: CFTimeInterval = 0.05
     static let lookupWindowMs = 1000
     /// Safety net for a missed destroyed notification: a click closes the switcher, and until the
-    /// controller hears of it, the held ⌘ release stays swallowed.
+    /// controller hears of it, the stack edges stay on screen.
     static let livenessInterval: CFTimeInterval = 0.1
     /// Consecutive failed reads (timeouts) before the switcher is taken to be gone.
     static let failureLimit = 3

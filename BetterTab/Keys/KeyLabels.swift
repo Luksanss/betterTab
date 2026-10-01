@@ -1,7 +1,7 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// The physical keys that pick rows in the window list, and what the current keyboard layout
+/// The physical keys that pick tiles in the ⌘§ switcher, and what the current keyboard layout
 /// prints on them.
 enum KeyLabels {
     /// A S D F G H J K L by position (`kVK_ANSI_A` … `kVK_ANSI_L`). Positions, not characters: on
@@ -15,7 +15,7 @@ enum KeyLabels {
     static let qwerty = ["A", "S", "D", "F", "G", "H", "J", "K", "L"]
 
     /// One label per entry in `keyCodes`, uppercased, for the layout in use right now. Cheap, so
-    /// it's read each time the list opens rather than kept up to date with an observer.
+    /// it's read each time the switcher opens rather than kept up to date with an observer.
     static func current() -> [String] {
         guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
               let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)

@@ -156,7 +156,7 @@ enum Focuser {
         return true
     }
 
-    /// Returns whether the window was minimized. The window list read the flag moments ago, which
+    /// Returns whether the window was minimized. The ⌘§ switcher read the flag moments ago, which
     /// saves an AX round trip; setting it on a window that's no longer minimized does nothing.
     private nonisolated static func restoreIfMinimized(_ target: Target) -> Bool {
         guard target.isMinimized else { return false }
