@@ -1,10 +1,10 @@
 # BetterTab
 
-A macOS menu-bar utility. Release ⌘⇥ on an app with more than one window, and instead of
-switching, the switcher stays open and lists that app's windows. Press A, S, D… to pick one.
-And ⌘§ (the key above Tab on ISO keyboards) is ⌘⇥ for the front app's windows, drawn by
-BetterTab itself. Both are built, including windows on other Spaces. See `docs/handoff.md` for
-where testing stands.
+A macOS menu-bar utility. ⌘§ (the key above Tab on ISO keyboards) is ⌘⇥ for the front app's
+windows, drawn by BetterTab itself, windows on other Spaces included. ⌘⇥ stays native: BetterTab
+only draws stack edges behind the icons of apps with more than one window. Until 2026-10-01,
+releasing ⌘⇥ on such an app opened a window list; that was removed (`docs/spec.md` § Out of
+scope). See `docs/handoff.md` for where testing stands.
 
 ## Start here
 
@@ -29,33 +29,35 @@ One developer, one user, so keep it simple.
   is taken. If the maintainer merges through a GitHub pull request, the next `/handoff-update` on
   `dev` writes that archive. Between releases, `/handoff-update` rewrites `docs/handoff.md` in
   place and writes no archive.
-- **The required check is a clean build of both schemes,** Debug and Release, with no warnings in
-  our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by hand. The
-  `.noindex` suffix keeps the dev builds out of Spotlight, so the launcher doesn't list them.
+- **The required check is a clean build of the BetterTab scheme,** Debug and Release, with no
+  warnings in our code. There are no automated tests; `docs/spec.md` § Acceptance tests are run by
+  hand. The `.noindex` suffix keeps the dev builds out of Spotlight, so the launcher doesn't list
+  them.
   ```
-  for s in BetterTab Experiment; do for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme $s -configuration $c -derivedDataPath build/DerivedData.noindex build | grep -E 'error|warning: |BUILD' ; done; done
+  for c in Debug Release; do xcodebuild -project BetterTab.xcodeproj -scheme BetterTab -configuration $c -derivedDataPath build/DerivedData.noindex build | grep -E 'error|warning: |BUILD' ; done
   ```
 - **The project is a plain Xcode project with synchronized folders.** Files added under
-  `BetterTab/` or `Experiment/` join their target automatically, so `project.pbxproj` rarely
-  needs editing. `Experiment` is the throwaway target for `docs/architecture.md` § The experiment.
+  `BetterTab/` join the target automatically, so `project.pbxproj` rarely needs editing.
 - **Builds are signed with the maintainer's Apple Development certificate** (Personal Team
   `5KDU5HYH35`), so the Accessibility grant survives rebuilds. Only the maintainer can grant it;
   agents never change security settings. If signing ever fails for a new target or bundle ID, add
   `-allowProvisioningUpdates` once.
-- **Debug builds have a self-test** that drives ⌘⇥ and ⌘§ end to end with synthetic keys and
-  writes a report without titles. Quit BetterTab first, then run
-  `open -g build/DerivedData.noindex/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`
-  (`--long` adds the 15 s timeout test). It presses keys and switches Spaces for about two minutes,
-  so only run it when the maintainer isn't using the Mac, and never with the screen locked.
+- **Debug builds have a self-test** that drives native ⌘⇥ under the stack edges, and ⌘§, with
+  synthetic keys, and writes a report without titles. The app in front needs two or more windows
+  (three for `windows-cycle`); scratch TextEdit documents work. Quit BetterTab first, then run
+  `open -g build/DerivedData.noindex/Build/Products/Debug/BetterTab.app --args --self-test /abs/path/report.json`.
+  It presses keys and switches Spaces for about a minute, so only run it when the maintainer isn't
+  using the Mac, and never with the screen locked.
 
 ## Rules that are expensive to forget
 
 - **Stay minimal.** DockDoor does this too, but it's bloated; that's why BetterTab exists. New
   features need a reason beyond "an alternative app has it".
-- **Never leave a ⌘ release swallowed.** Holding the native switcher open means hiding the ⌘
-  release from macOS, so every way out must post a synthetic ⌘ release.
-- **Don't turn off native ⌘⇥** unless route B has been chosen and recorded in the handoff. Turning
-  it off lasts after the app exits. See `docs/handoff.md` § Safety constraints.
+- **Never swallow ⌘.** ⌘§ swallows § and the keys pressed while its switcher is up, but ⌘ passes
+  both ways, so BetterTab can't leave ⌘ stuck. Holding the native switcher open meant hiding the
+  ⌘ release from macOS; it was removed on 2026-10-01, so don't bring it back unasked.
+- **Never turn off native ⌘⇥.** `CGSSetSymbolicHotKeyEnabled` lasts after the app exits
+  (`docs/architecture.md` § Route A+, removed).
 - **Don't copy code from AltTab or DockDoor.** Both are GPL-3.0; read them to learn the approach.
   WindowLens is MIT, so it can be reused as long as its copyright notice is kept.
 - **Agents never push or open pull requests.** The maintainer does.

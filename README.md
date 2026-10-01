@@ -2,11 +2,11 @@
 
 # BetterTab
 
-A ⌘⇥ for macOS that knows about windows.
+A ⌘⇥ for the windows of the app you're in.
 
 ⌘⇥ switches between apps, so with two Chrome windows open it always takes you to the one you used
-last. BetterTab keeps the native switcher. Release ⌘ on an app with more than one window, and the
-switcher stays open with a list of that app's windows. Press A, S, D… to go straight to one.
+last. BetterTab adds ⌘§, the key above Tab: it does for the front app's windows what ⌘⇥ does for
+apps. And the native ⌘⇥ switcher shows which apps have more than one window.
 
 ## Install
 
@@ -20,21 +20,21 @@ It needs macOS 27.
 
 ## Use
 
-Hold ⌘ and press Tab as usual. Apps with more than one window show the edges of more windows
-stacked behind their icon. Single-window apps switch natively.
-
-| Key | What happens |
-|---|---|
-| **A, S, D…** | Opens that window |
-| **↑ / ↓**, **Return** | Moves the highlight, and opens the highlighted window |
-| **Esc**, or **⌘** pressed and released | Cancels |
-| **⌘⇥** | Goes back to cycling |
-
 To switch between the windows of the app you're in, hold ⌘ and press §, the key above Tab on an
 ISO keyboard. It works like ⌘⇥, but for that app's windows: each tile shows where its window sits
-on its display. Press § again to move on (⇧§ goes back), and release ⌘ to open the highlighted
-window. A quick ⌘§ tap flips to the window you were in before. A, S, D… open a window at once,
-and Esc cancels.
+on its display.
+
+| Key, with ⌘ held | What happens |
+|---|---|
+| **§** / **⇧§** | Moves to the next / previous window |
+| **⌘** released | Opens the highlighted window |
+| **A, S, D…** | Opens that window at once |
+| **Esc** | Cancels |
+
+A quick ⌘§ tap flips to the window you were in before.
+
+⌘⇥ stays exactly as macOS has it. While you cycle, apps with more than one window show the edges
+of more windows stacked behind their icon, so you know when ⌘§ will have somewhere to go.
 
 The menu-bar item shows whether BetterTab is active and which version it is, and has Launch at
 Login and Quit. There are no settings.
