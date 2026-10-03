@@ -7,8 +7,9 @@ only the newest of them runs. The workflow is `.github/workflows/release.yml`, a
 ## How a release happens
 
 1. You merge `dev` into `main` and push.
-2. GitHub Actions builds the Release configuration on the `xcode-27` runner, zips `BetterTab.app`
-   and publishes it as `v<version>`, with the release notes GitHub generates.
+2. GitHub Actions builds the Release configuration on the `xcode-27` runner, packs `BetterTab.app`
+   into a disk image (§ The disk image) and publishes it as `v<version>`, with the release notes
+   GitHub generates.
 3. If that version's tag already exists, the run does nothing. To run it again by hand, use
    Actions → Release → Run workflow, on `main`. It refuses any other branch.
 
@@ -22,8 +23,30 @@ A version is `MARKETING_VERSION` plus the number of commits on `main`: `0.1.87` 
 count alone. For a new minor, bump `MARKETING_VERSION` in the BetterTab target's Build Settings.
 The last part is automatic and never resets.
 
-To build a release zip locally: `scripts/build-release.sh 0.1.87 87`. That's ad-hoc; pass an
-identity (`security find-identity -v -p codesigning` lists them) as a third argument to sign it.
+To build a release disk image locally: `scripts/build-release.sh 0.1.87 87`. It lands in
+`build/release/`. That's ad-hoc; pass an identity (`security find-identity -v -p codesigning`
+lists them) as a third argument to sign it.
+
+## The disk image
+
+`BetterTab-<version>.dmg` opens to one window: the app, a link to Applications, and a background
+that says what to do. The background is drawn by `design/dmg/make-background.swift`
+(`design/dmg/README.md`); the layout is `scripts/dmg-settings.py`.
+
+- **[dmgbuild](https://github.com/dmgbuild/dmgbuild)** (MIT) writes the window's `.DS_Store`
+  directly, without Finder, so it runs on CI. The script installs it into `build/dmgbuild` from
+  `scripts/dmgbuild-requirements.txt`, pinned by hash, and needs Python 3.10 or later; macOS's
+  own `/usr/bin/python3` is 3.9, so the workflow sets up Python first.
+- **Finder's window bounds include its 32 pt title bar,** and the background is pinned below it.
+  So the window is the picture's full 640 × 400 pt and its last 32 pt never show. Measured on a
+  third-party installer on 2026-10-04.
+- **Don't hide the `.app` extension in the image** (dmgbuild's `hide_extensions`). It sets a
+  Finder flag on the bundle, and `codesign --verify --strict` then rejects the app. Finder hides
+  it anyway.
+- **macOS 27 says `hdiutil`'s `create`, `attach` and `convert` are deprecated** in favour of
+  `diskutil image`. Those warnings come from dmgbuild and don't fail the build.
+- **The image isn't signed or notarized,** like the app, so the first launch still needs Open
+  Anyway. The image only changes how installing looks.
 
 ## Signing with your certificate
 
