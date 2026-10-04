@@ -18,6 +18,9 @@ apps. And the native ⌘⇥ switcher shows which apps have more than one window.
 
 It needs macOS 27.
 
+To update, choose Check for Updates… in BetterTab's menu. If there's a newer version, Install
+replaces the app and relaunches it, and the Accessibility permission carries over.
+
 ## Use
 
 To switch between the windows of the app you're in, hold ⌘ and press §, the key above Tab on an
@@ -37,7 +40,7 @@ A quick ⌘§ tap flips to the window you were in before.
 of more windows stacked behind their icon, so you know when ⌘§ will have somewhere to go.
 
 The menu-bar item shows whether BetterTab is active and which version it is, and has Launch at
-Login and Quit. There are no settings.
+Login, Check for Updates… and Quit. There are no settings.
 
 ## Build
 
@@ -47,8 +50,10 @@ the Accessibility grant on every rebuild.
 
 ## Privacy
 
-No network code, analytics or crash reporting. Window titles and positions stay in memory only
-while a switcher is open, and are never logged.
+BetterTab goes online only when you choose Check for Updates…, to ask GitHub for the latest
+release and, if you click Install, to download it. Nothing about you or your Mac is sent. There's
+no analytics or crash reporting. Window titles and positions stay in memory only while a switcher
+is open, and are never logged.
 
 ## More
 

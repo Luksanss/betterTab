@@ -14,7 +14,7 @@ only the newest of them runs. The workflow is `.github/workflows/release.yml`, a
    Actions → Release → Run workflow, on `main`. It refuses any other branch.
 
 Releases aren't notarized, so on first launch users click Open Anyway in System Settings →
-Privacy & Security.
+Privacy & Security. After that they update from the app's menu (§ Updates).
 
 ## Versions
 
@@ -52,12 +52,37 @@ that says what to do. The background is drawn by `design/dmg/make-background.swi
 
 Without the two secrets below, releases are signed ad-hoc. An ad-hoc build's designated
 requirement is its cdhash, so every update loses the Accessibility grant, while a
-certificate-signed one keeps it. To sign releases with your Apple Development certificate:
-1. In Keychain Access → My Certificates, right-click **Apple Development: …** → Export. Save it as
-   `cert.p12` (Personal Information Exchange) and set a password.
-2. `base64 -i cert.p12 | pbcopy`, then `gh secret set SIGNING_CERT_P12` and paste.
-3. `gh secret set SIGNING_CERT_PASSWORD` and type the password.
-4. `rm cert.p12 && pbcopy < /dev/null`, which deletes the file and clears the clipboard.
+certificate-signed one keeps it.
+
+The exported certificate carries its private key, and whoever holds that key can sign an app that
+Macs accept as BetterTab, Accessibility grant included. So it's kept where only the release job
+can read it:
+- **The secrets live in the `release` environment,** which only `main` can use. Repository
+  secrets would be readable by a workflow pushed to any branch. The job names the environment.
+- **Actions are pinned by commit,** not by tag, because the key sits unlocked in the job's
+  keychain while later steps run. dmgbuild is pinned by hash for the same reason.
+- **The GitHub account has two-factor sign-in,** since anyone who can push can change the workflow.
+
+To sign releases with your Apple Development certificate:
+1. Once: on GitHub, Settings → Environments → New environment, named `release`. Under Deployment
+   branches and tags choose Selected branches and tags, and add `main`.
+2. In Keychain Access → My Certificates, right-click **Apple Development: …** → Export. Save it as
+   `cert.p12` (Personal Information Exchange) with a long random password.
+3. `base64 -i cert.p12 | gh secret set SIGNING_CERT_P12 --env release`. It goes in through the
+   pipe, without the clipboard.
+4. `gh secret set SIGNING_CERT_PASSWORD --env release`, and type the password when asked.
+5. `rm cert.p12`.
 
 The next release is signed. Each run's summary says whether it was signed or ad-hoc. When the
-certificate expires and you renew it, repeat these steps.
+certificate expires (the current one on 2027-09-29) and you renew it, repeat steps 2–5.
+
+## Updates
+
+Planned on 2026-10-04 and not built yet: Check for Updates… in the app's menu installs the latest
+release (`docs/spec.md` § Updates, `docs/architecture.md` § Updates). What it means for releases:
+- **Each release will have to carry what the updater reads,** signed by the workflow. With
+  Sparkle, that's an appcast feed and an EdDSA signature of the disk image, and the EdDSA private
+  key becomes a third secret.
+- **Updates keep the Accessibility grant only between certificate-signed releases** (§ Signing
+  with your certificate). Set up signing before relying on the updater; until then every update,
+  through the menu or by hand, asks for Accessibility again.

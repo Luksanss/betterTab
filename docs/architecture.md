@@ -2,7 +2,8 @@
 
 BetterTab draws the stack edges over the native ⌘⇥ switcher and runs ⌘§, its own switcher for the
 front app's windows. Until 2026-10-01 it also held the native switcher open for a window list
-(route A+, § Route A+, removed). Research was done on 2026-09-29. Anything marked **(verified)**
+(route A+, § Route A+, removed). Its only network code is the update check (§ Updates, not built
+yet). Research was done on 2026-09-29. Anything marked **(verified)**
 was either read in the source of an app that ships the technique, or probed read-only on the dev
 machine (macOS 27.0, Xcode 27.0, Swift 6.4, arm64). The three apps are:
 
@@ -131,14 +132,41 @@ The MVP needs **Accessibility only**, because window titles come from AX. Window
 Recording**, which recent macOS versions ask the user to re-approve from time to time. Both are out
 of scope.
 
-macOS ties the Accessibility grant to the app's code signature. Sign every dev build with the
-same Apple Development identity rather than ad hoc. Otherwise expect to grant access again in
-System Settings → Privacy & Security → Accessibility after rebuilds. This is known macOS
-behaviour but hasn't been hit here yet. Also fix the bundle ID from day one, because the grant
-depends on it too.
+macOS ties the Accessibility grant to the app's designated requirement, which comes from its code
+signature (§ Updates). Sign every build, dev builds and releases alike, with the same Apple
+Development identity rather than ad hoc. Otherwise expect to grant access again in System Settings
+→ Privacy & Security → Accessibility after every rebuild or update. The ad hoc releases up to
+v1.0.71 did exactly that, and new Debug builds lost the grant twice on 2026-09-30 despite the
+certificate, for a reason not yet found (`docs/handoff.md`, Findings). Also fix the bundle ID
+from day one, because the grant depends on it too.
 
 The app can't be sandboxed or ship on the App Store. Both rule out using Accessibility to control
 other apps and calling private APIs.
+
+## Updates (planned 2026-10-04)
+
+Not built yet; `docs/spec.md` § Updates says what it does. Which code does it is still open
+(`docs/handoff.md`, Next action): [Sparkle](https://github.com/sparkle-project/Sparkle) (MIT), the
+usual macOS updater, or a small one of our own. Either way:
+- **Only on request.** There's no timer, launch check or background check. The menu item starts the
+  one request, so idle stays at 0% CPU with no timers.
+- **Two checks before anything is replaced.** The download must carry a signature that only the
+  release workflow can make (such as Sparkle's EdDSA signature), and the new app's code signature
+  must satisfy the running app's designated requirement. The first proves the download came from
+  our release. The second proves macOS will treat it as the same app, so the Accessibility grant
+  carries over. A download that fails either is deleted.
+- **The grant follows the designated requirement.** A certificate-signed build's requirement names
+  the certificate (`anchor apple generic and certificate leaf[subject.CN] = "Apple Development:
+  …"`), and an ad hoc build's is its cdhash, which every build changes. So updates keep the grant
+  only once releases are certificate-signed, and the first certificate-signed release still asks
+  once.
+- **Replacing the app.** BetterTab isn't sandboxed, and a copy dragged into `/Applications` belongs
+  to the user, so it can replace itself. The swap happens after BetterTab quits, which removes the
+  key tap first, and then the new copy is launched.
+- **Quarantine.** A non-sandboxed app's own downloads aren't quarantined unless it opts in, so
+  Gatekeeper shouldn't ask for Open Anyway again. Unverified on macOS 27 (acceptance test 20).
+- **Where updates come from.** The latest GitHub release, over HTTPS. The release workflow will have
+  to publish whatever the updater reads, and sign it (`docs/releasing.md` § Updates).
 
 ## Windows on every Space
 
