@@ -1,22 +1,25 @@
 # Handoff
 
-Updated on 2026-10-04, after release 6. The maintainer merged pull request 6, which published
-v1.0.71, the first disk image, at 09:35 UTC. Its handoff is archived at
-`docs/archive/handoffs/2026-10-04-dmg.md`, written in this session, before these edits.
+Updated on 2026-10-04, for release 7: Check for Updates…, built on Sparkle, and the first release
+signed with the maintainer's certificate. The maintainer asked "i want to add auto-update/manual
+update so i dont have to delete, install and allow permissions every time", then, told the spec
+ruled it out, "okay lets update the scope, we value privacy, but updater is needed", and last "yes
+commit, then let's build it with sparkle". This handoff is written as if `dev` is merged into
+`main` next (Next action 1); `/handoff` checks it against git. The handoff as of release 6 is
+archived at `docs/archive/handoffs/2026-10-04-dmg.md`. Release 6 went through pull request 6
+earlier on 2026-10-04, so its archive was written in this session, as the convention below says.
 
-Then updating came into scope. The maintainer: "i want to add auto-update/manual update so i dont
-have to delete, install and allow permissions every time", and, told the spec ruled it out, "okay
-lets update the scope, we value privacy, but updater is needed. update all docs, readme, claude.md
-and whatnot to reflect this and update the other info (like the zips)." The docs now describe the
-updater as planned (Decisions); nothing is built. Next the maintainer wants to talk through signing:
-"how to safely add signing cert, where do i get the cert and how does it really work" (Next
-action 2). A full `/handoff-update` is still due at the end of the session.
+Release 7 carries, since v1.0.71:
+- **Check for Updates… in the menu** (`docs/spec.md` § Updates). Release builds only. Sparkle
+  2.10.0 shows the new version and its notes, then downloads, checks, replaces and relaunches.
+  BetterTab goes online only then (spec principle 5).
+- **Signed releases.** The certificate and Sparkle's key live in the `release` environment, which
+  only `main` can use, and the workflow refuses to release without them (`docs/releasing.md`).
+- **`appcast.xml` on every release,** and release notes from the `feat`, `fix` and `perf` commits
+  since the last release, on the GitHub release too (`scripts/make-appcast.sh`).
 
-Release 6, v1.0.71, carried, since v1.0.68:
-- **A disk image instead of a zip.** `BetterTab-<version>.dmg` opens to one window: the app, a
-  link to Applications, and a background that reads "Drag. Drop." with ⌘ and § as keycaps
-  (`docs/releasing.md` § The disk image, `design/dmg/README.md`).
-- **Local release builds go to `build/release-DerivedData.noindex`,** out of Spotlight.
+If nothing else lands first, it's **v1.0.78**: the 71 commits on `main`, the six on `dev`, and the
+merge.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -24,8 +27,9 @@ the maintainer says a version works. At that point it's copied to
 `docs/archive/handoffs/<ISO date>.md` in the same commit, with a topical suffix such as `-ci` (not
 a number) if that date is taken. If the merge goes through a GitHub pull request, the archive
 can't be in the merge commit, so the next `/handoff-update` on `dev` writes it; that's what
-happened for releases 1, 2, 3 and 5. This file is then started fresh. Never leave the live handoff
-under `docs/archive/handoffs/`; readers are told to treat that directory as historical only.
+happened for releases 1, 2, 3, 5 and 6. This file is then started fresh. Never leave the live
+handoff under `docs/archive/handoffs/`; readers are told to treat that directory as historical
+only.
 
 This document records what is **not** obvious from the code or `git log`: decisions and the
 reasoning behind them, findings that were expensive to learn, and the next action. There's no
@@ -34,84 +38,84 @@ ticket tracker; the next action below is the backlog.
 ## Working copy state
 
 - **`main`** is release 6, v1.0.71 (`0d4efaa`, the merge of pull request 6), published on
-  2026-10-04.
-- **`dev`** has release 6's commits, pushed (`origin/dev` at `aa27d7e`), plus this session's
-  docs for updates.
+  2026-10-04. It should become `dev` merged in: release 7.
+- **`dev`** is six commits ahead of `main`: `5a3fd07` (the `release` environment), `a1cb647`
+  (updates in scope), `ab2de92` (Check for Updates…), `7b2bebf` (Sparkle's public key),
+  `1e74bc9`, and this handoff. `origin/dev` is at `aa27d7e`; the rest isn't pushed.
 - **The installed app is v1.0.71** in `/Applications`, ad hoc like every release so far
-  (`codesign -dv` says `Signature=adhoc`), because no secrets were set before release 6.
+  (`codesign -dv` says `Signature=adhoc`), and without the updater.
 - **A local test image:** `build/release/BetterTab-1.0.99.dmg`, ad hoc, from
   `scripts/build-release.sh 1.0.99 99`, with Sparkle in it; the version is a test number. Beside
   it, an `appcast.xml` and `notes.md` from `scripts/make-appcast.sh`, signed with a throwaway key:
   the agent wrote that key's public half into the built app's Info.plist under
   `build/release-DerivedData.noindex` to test the signature check, so that build isn't a real one.
   `build/dmgbuild` is the venv the script made, on Homebrew's Python 3.14.
-- **The Debug build** in `build/DerivedData.noindex` was rebuilt on 2026-10-04 by the `CLAUDE.md`
-  check; its app code is release 5's.
+- **The Debug build** in `build/DerivedData.noindex` has Sparkle linked but no Check for Updates….
+  The resolved package, and Sparkle's tools (`generate_keys`, `sign_update`), are under its
+  `SourcePackages/`; the tools are in `artifacts/sparkle/Sparkle/bin/`.
 - **A leftover worktree:** `.claude/worktrees/relaxed-swanson-940c4a` on branch
   `claude/relaxed-swanson-940c4a`, from the release 4 task session, at `4edefd8`. Its Debug and
   Release builds are registered with Launch Services, so run `lsregister -u` on both `.app`s under
   its `build/DerivedData.noindex/Build/Products/` before `git worktree remove` and `git branch -D`.
-- **Dev builds** go to `build/DerivedData.noindex`. The `CLAUDE.md` check now builds the one
-  scheme, BetterTab, and passes. The only `warning:` lines are xcodebuild's "Using the first of
-  multiple matching destinations" and `appintentsmetadataprocessor`'s "Metadata extraction
+- **Dev builds** go to `build/DerivedData.noindex`. The `CLAUDE.md` check builds the one scheme,
+  BetterTab, and passes. The only `warning:` lines are xcodebuild's "Using the first of multiple
+  matching destinations" and, sometimes, `appintentsmetadataprocessor`'s "Metadata extraction
   skipped"; neither is from our code.
 - **GitHub:** `Luksanss/betterTab` is public, with its history unchanged and no LICENSE. The
-  signing secrets are in the `release` environment, which only `main` can use (Next action 2).
+  `release` environment (deployment branch `main` only) holds `SIGNING_CERT_P12`,
+  `SIGNING_CERT_PASSWORD` and `SPARKLE_ED_PRIVATE_KEY`, set by the maintainer on 2026-10-04; there
+  are no repository secrets. The account has two-factor sign-in.
+- **The keys:** the Apple Development certificate is in the maintainer's login keychain, valid
+  until 2027-09-29. Sparkle's private key is in the same keychain (`generate_keys -p` prints its
+  public half, which matches `SUPublicEDKey`). The exported `.p12` and key file were deleted.
 - **Dev machine:** macOS 27.0.1 (26A434) on Apple Silicon, Xcode 27.0, Swift 6.4. An ISO keyboard
   with ABC and Czech-QWERTY layouts; the built-in 1512 × 982 display, and a 1920 × 1080 one to its
   left (x −1920 in global coordinates).
 
 ## Next action
 
-1. **Check release 6's disk image.** Download the `.dmg` from the v1.0.71 release page, open it,
-   and check the window against `design/dmg/README.md`: the background shows down past the icons'
-   names, the names are readable in light and dark mode, and the disk has the keycap icon.
-2. **See the first signed release work** (`docs/releasing.md` § Signing with your certificate).
-   Set up on 2026-10-04, after the agent explained where the certificate comes from, how signing
-   keeps the grant, and how to store it safely. The maintainer turned on two-factor sign-in,
-   created the `release` environment (deployment branch `main` only), set `SIGNING_CERT_P12` and
-   `SIGNING_CERT_PASSWORD` in it, and deleted the exported `.p12`. The agent made the workflow use
-   the environment and pinned its actions by commit. The repo has no repository secrets. Nothing
-   is signed until that workflow change reaches `main`. Then the run's summary should say "Signed
-   with the Apple Development certificate"; a wrong password or a `.p12` without its key fails
-   the import step, and nothing is published. That release asks for Accessibility once more;
-   later ones keep the grant.
-3. **Finish the updater and ship it** (`docs/spec.md` § Updates, `docs/architecture.md`
-   § Updates). Built on Sparkle 2.10.0 on 2026-10-04: the menu item, `BetterTab/Info.plist`,
-   `scripts/make-appcast.sh` and the workflow steps. Left:
-   - **Sparkle's key.** The maintainer generated it on 2026-10-04; its public half is in
-     `SUPublicEDKey` and matches the login keychain (`generate_keys -p`), and
-     `SPARKLE_ED_PRIVATE_KEY` is in the `release` environment beside the certificate's two secrets
-     (`docs/releasing.md` § Updates). The exported key file was deleted.
-   - **Release it.** The first release with Sparkle is installed by hand and asks for Accessibility
-     once, being the first certificate-signed one. Its run summary should say "Signed with the
-     Apple Development certificate", and the release should carry `appcast.xml`.
-   - **Then acceptance test 20 needs a second release,** installed through Check for Updates….
-     Nobody has seen Sparkle's windows in BetterTab yet: Debug builds don't have the item.
-4. **Finish the docs for "only ⌘§"** (maintainer, 2026-10-04: "update readme and all according
+1. **Release 7: push `dev`, open the pull request and merge it** (the maintainer; agents don't
+   push): `git push origin dev`, `gh pr create --base main --head dev --fill`,
+   `gh pr merge dev --merge`. It's the first run with the environment, the keychain import and
+   the Sparkle step, so check:
+   - the run's summary says "Signed with the Apple Development certificate". A wrong password, a
+     `.p12` without its key, or a Sparkle key that doesn't match `SUPublicEDKey` fails the run
+     before anything is published;
+   - the release lists `BetterTab-1.0.78.dmg` and `appcast.xml`, and its notes read "Add Check
+     for Updates… to the menu";
+   - install it by hand from the disk image. macOS asks for Open Anyway and Accessibility once
+     more, being the first certificate-signed release. Then Check for Updates… should say
+     "You're up to date!", which shows Sparkle reads the feed and accepts its key;
+   - the disk image's window, never seen for real: the background shows down past the icons'
+     names, the names are readable in light and dark mode, and the disk has the keycap icon.
+2. **Acceptance tests 20 and 21 with release 8.** The next release, whatever it carries, should
+   install through Check for Updates… with no permission prompt and no Open Anyway, and keep
+   Launch at Login. Nobody has seen Sparkle's windows in BetterTab yet, since Debug builds don't
+   have the item. Also watch whether Debug builds stop losing the grant (Findings).
+3. **Finish the docs for "only ⌘§"** (maintainer, 2026-10-04: "update readme and all according
    docs co reflect the new direction of only cmd + §"). The README, spec, product, architecture
    and `CLAUDE.md` already describe native ⌘⇥ with stack edges, plus ⌘§ (commit `0b62226`). Still
    wrong: `docs/design-brief-v5.md`, the brief for the ⌘⇥ window list. First ask whether "only ⌘§"
    means the stack edges go too: they stayed on 2026-10-01, and removing them is a code change.
-5. **Find out what the Space switch in `BetterTab/Focus/Focuser.swift` really does.** Every
+4. **Find out what the Space switch in `BetterTab/Focus/Focuser.swift` really does.** Every
    cross-Space pick on 2026-09-30 logged "space didn't switch" after its 300 ms wait and fell back
    to `activate`, yet the maintainer says those picks work, ⌘§'s between two full-screen windows
    included. Measure when the Space actually changes, make the log say what happened, and see
    whether a pick can take less than the ~330 ms before the fallback plus the slide.
-6. **Run the self-test** when the Mac is free: `open -g …/Debug/BetterTab.app --args --self-test
+5. **Run the self-test** when the Mac is free: `open -g …/Debug/BetterTab.app --args --self-test
    /abs/path/report.json`. No run of the current scenarios is recorded: `native-single`,
    `native-multi` (`BetterTab/Debug/SelfTestScenarios.swift`), and `windows-flip`, `windows-escape`
    and `windows-cycle` (`BetterTab/Debug/SelfTestWindowScenarios.swift`). The app in front is home
    and needs two windows, three for `windows-cycle`; scratch TextEdit documents work. `native-multi`
    needs another app with two or more windows, and `native-single` one with exactly one.
-7. **The maintainer runs acceptance tests 1–19 by hand** (`docs/spec.md`, renumbered on
+6. **The maintainer runs acceptance tests 1–19 by hand** (`docs/spec.md`, renumbered on
    2026-10-01), especially 11 (⌘§ to a full-screen window, and whether another window flashes
    first), 16 (`kill -9` during ⌘§) and 17 (the first-launch prompt, seen only on a Debug build so
-   far). Tests 20 and 21, added on 2026-10-04, wait for two releases with the updater.
-8. **Still to discuss** (the maintainer said "we will discuss later" on 2026-09-30):
+   far).
+7. **Still to discuss** (the maintainer said "we will discuss later" on 2026-09-30):
    - ⌘§ on ANSI keyboards, which have no § key (their key above Tab is ⌘`'s);
    - ⌘§'s order across Spaces (Findings).
-9. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
+8. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
 
 ## Decisions already settled
 
@@ -137,6 +141,13 @@ ticket tracker; the next action below is the backlog.
     `SULastCheckTime`, a skipped version).
   - It overturns "no automatic updates, because the app has no network code", from the releases
     decision below.
+- **Releases are signed with the maintainer's certificate, and the key is guarded** (2026-10-04).
+  The agent explained where the certificate comes from, how the designated requirement keeps the
+  grant, and how to store the key. The maintainer did each step: two-factor sign-in, the `release`
+  environment limited to `main`, the secrets set by piping into `gh secret set --env release`, and
+  the exported files deleted. The agent pinned the workflow's actions by commit, because the key
+  sits unlocked in the job's keychain while they run. Agents never handle the private keys; the
+  maintainer exports and uploads them.
 - **Releases ship as a disk image, in English, with no zip** (maintainer, 2026-10-04). Shown
   another app's installer window, the maintainer asked "what do we need so our installation is
   like this too?", then "use english and ship dmg only, generate something cool as a background
@@ -270,6 +281,15 @@ ticket tracker; the next action below is the backlog.
   installed. The installed v1.0.71 says `Signature=adhoc` (`codesign -dv`), and an ad hoc app's
   designated requirement is its cdhash, which every build changes. An updater alone doesn't fix it;
   signing does.
+- **The Debug build's designated requirement names the certificate** (`identifier
+  "com.luksanss.BetterTab" and anchor apple generic and certificate leaf[subject.CN] = "Apple
+  Development: … (M44FR7B6NJ)" and certificate 1[field.1.2.840.113635.100.6.2.1]`), and the
+  installed v1.0.71's is `cdhash H"2198310d…"`. A guess, not tested: the one Accessibility record
+  per bundle ID holds whichever copy's requirement was granted last, so the ad hoc release and the
+  Debug builds took the grant from each other. Signed releases share the Debug builds' requirement.
+- **Repository secrets reach a workflow pushed to any branch;** environment secrets reach only the
+  branches the environment allows, and only jobs that name it. `gh secret set --env` needs the
+  environment to exist first.
 - **A pull request merged on GitHub doesn't move the local `origin/main`.** Without a fetch,
   `gh pr list --state all` and `gh release list` show what landed.
 - **Release 6's workflow ran its Python and disk image steps on CI for the first time,** and
@@ -379,8 +399,7 @@ ticket tracker; the next action below is the backlog.
 - **Every build gets registered as an app.** A folder ending in `.noindex` keeps Spotlight out.
   `lsregister -u <path>` removes a stale record.
 - **The release script was tested locally in both modes** when it made a zip; its disk image only
-  ad hoc (2026-10-04). The workflow's keychain import still hasn't run, because no secret has
-  reached it.
+  ad hoc (2026-10-04). The workflow's keychain import first runs with release 7.
 
 **From the 2026-09-30 build session, all on this Mac:**
 - **The self-test needs a multi-window home app,** or it skips almost everything. Safe targets:
@@ -416,28 +435,31 @@ Public APIs can't reliably focus one window. The API table is in `docs/architect
 
 ## Known gaps
 
+- **The updater has never run,** and Sparkle's windows have never been seen in BetterTab (Next
+  actions 1 and 2).
+- **The release workflow's keychain import and Sparkle step have never run** (Next action 1).
 - **Nobody has looked at the disk image's real Finder window** in light or dark mode; the design
   was approved from an offscreen preview (Next action 1).
-- **The updater has never run:** it waits for Sparkle's key and two releases (Next action 3).
-- **No self-test run of the current scenarios is recorded** (Next action 6).
-- **Cross-Space focusing always logs a fallback,** although the picks work (Next action 5).
+- **No self-test run of the current scenarios is recorded** (Next action 5).
+- **Cross-Space focusing always logs a fallback,** although the picks work (Next action 4).
 - **New builds lose the Accessibility grant** despite the certificate signing (Findings).
 - **Whether ⌘§'s `.hudWindow` material looks right in light mode is unseen.**
-- **The release workflow's keychain import has never run.**
 - **The first-launch prompt is unconfirmed for a release** (acceptance test 17); it has been seen
   on a Debug build.
 - **Unverified on macOS 27:**
   - whether another window of the app flashes before the picked one (test 11);
   - whether a lone make-key mouse down leaves an app thinking the button is held;
-  - tag bit 60 for minimized windows.
+  - tag bit 60 for minimized windows;
+  - that Sparkle's release from quarantine spares an update the Open Anyway (test 20).
 - **Nobody but the maintainer has installed it yet.**
 - **The build check is manual.** The only workflow is the release.
 
 ## Safety constraints
 
-Nothing is deployed anywhere except the GitHub releases: zips up to v1.0.68, disk images after. The
-risk is to the maintainer's own Mac: the app under development changes system state on the machine
-it runs on.
+Nothing is deployed anywhere except the GitHub releases: zips up to v1.0.68, disk images after,
+with an appcast from release 7. Most of the risk is to the maintainer's own Mac: the app under
+development changes system state on the machine it runs on. From release 7, the release keys also
+decide what every installed copy accepts as an update.
 
 - **Never swallow ⌘.** The tap passes every flagsChanged event in every phase. ⌘§ swallows only
   the keyDowns pressed while ⌘ is held, and their keyUps. If a change ever swallowed a ⌘ release,
@@ -447,3 +469,7 @@ it runs on.
   build would leave the Mac with no ⌘⇥. If it's ever needed, record the decision here first, and
   commit a script that turns symbolic hotkeys 1 and 2 back on before the first build that calls it
   (the draft is in `docs/architecture.md` § Recovery as of v1.0.63).
+- **Keep Sparkle's guards on, and the keys where they are.** `SUVerifyUpdateBeforeExtraction`
+  stays on, the workflow keeps refusing to release without both keys, and the keys stay in the
+  `release` environment and the maintainer's keychain. Whoever holds Sparkle's key or the
+  certificate can ship an app that inherits Accessibility (`docs/architecture.md` § Updates).
