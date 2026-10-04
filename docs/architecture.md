@@ -71,10 +71,19 @@ the frames in its `stack-edges` scenario. It fails an icon that doesn't show its
 128 pt and scaled for smaller icons.
 
 **The native switcher's window** is Dock-owned, full-screen, at layer 20; the overlay panels sit
-at `.screenSaver`. The `AXProcessSwitcherList` is a direct child of the Dock's app element, found
-150–210 ms after ⌘⇥, and its items are 128 × 128 pt tiles whose `AXTitle` is the app's name. Any
-click closes the switcher, even one on BetterTab's own panel, so the stack edges are click-through.
-(All measured by test 0 on 2026-09-29; § Route A+, removed.)
+at `.screenSaver`. The `AXProcessSwitcherList` is a direct child of the Dock's app element, and
+its items are 128 × 128 pt tiles whose `AXTitle` is the app's name. Any click closes the switcher,
+even one on BetterTab's own panel, so the stack edges are click-through. (All measured by test 0
+on 2026-09-29; § Route A+, removed.)
+
+**Getting the counts up with the switcher** (measured 2026-10-04). The switcher appears in one
+frame, with no fade, so the counts have to arrive in the next one or two. The list shows up in AX
+140–150 ms after ⌘⇥, and the counts wait for it. `SwitcherWatcher` looks for it every 10 ms, and
+lists the running apps it matches icons to while it waits, since that takes about 20 ms. Each
+icon's title, position, size and URL come in one round trip. The read after finding the list
+then takes 1–2 ms, and drawing the counts under 1 ms. Before, looking every
+50 ms and listing the apps after finding the list, the counts came 17–42 ms after the switcher on
+a screen recording, which showed. The "switcher found" log line times each part.
 
 **`KeyTap` in detail.** It never swallows ⌘, so it never owes macOS anything. In Cycling it
 passes everything through and only watches for the end: ⌘ released, Esc, or a key arriving with ⌘

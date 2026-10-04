@@ -74,7 +74,7 @@ final class SwitchController {
         reset()
         phase = .cycling
         // Every app, not just those the switcher lists, so the counts are ready by the time it
-        // appears (150–210 ms later).
+        // appears (140–160 ms later).
         load(Self.regularAppPids())
         watcher.begin()
     }

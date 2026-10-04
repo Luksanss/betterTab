@@ -108,7 +108,10 @@ final class SwitcherWatcher {
 nonisolated private let switcherLog = Logger(subsystem: "com.luksanss.BetterTab", category: "switcher")
 
 nonisolated private enum SwitcherTiming {
-    static let lookupInterval: CFTimeInterval = 0.05
+    /// The list appears 100–150 ms after ⌘⇥, and the stack edges wait for it, so it's looked for
+    /// often; each look is a round trip or two to the Dock. Looking every 50 ms found it at
+    /// 170–225 ms, and the counts came up visibly after the switcher.
+    static let lookupInterval: CFTimeInterval = 0.01
     static let lookupWindowMs = 1000
     /// Safety net for a missed destroyed notification: a click closes the switcher, and until the
     /// controller hears of it, the stack edges stay on screen.
@@ -170,9 +173,14 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
     private var failures = 0
     /// Whether CFEqual recognises the list among the Dock's children, checked once when found.
     private var canCheckMembership = false
+    /// Listing the running apps takes about 20 ms, so it's done while the lookup waits for the
+    /// list, not after, when the stack edges are waiting for the first item read.
+    private var prefetchedApps: [SwitcherRunningApp]?
     private var foundAt: UInt64 = 0
     /// How the last item read matched icons to pids; counts only.
     private var mapping = ""
+    /// How long the parts of the last item read took, for the found log.
+    private var itemTiming = ""
 
     static func make(thread: AXObserverThread, deliver: @escaping @Sendable (SwitcherEvent) -> Void) -> SwitcherSession? {
         guard let dockPid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
@@ -200,6 +208,9 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
             switcherLog.error("AXObserverCreate on the Dock failed (\(result.rawValue, privacy: .public)); polling only")
         }
         schedule(every: SwitcherTiming.lookupInterval)
+        // The list appears 100–150 ms after ⌘⇥, long after this. An app launched in between
+        // goes unmatched, so it gets no count, and it has one window anyway.
+        prefetchedApps = SwitcherRunningApp.all()
     }
 
     func tearDown() {
@@ -279,6 +290,7 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
 
     /// False if the list is already gone, so the lookup keeps polling.
     private func attach(_ list: AXUIElement) -> Bool {
+        let began = DispatchTime.now().uptimeNanoseconds
         if let observer {
             let refcon = Unmanaged.passUnretained(self).toOpaque()
             let destroyed = AXObserverAddNotification(observer, list, kAXUIElementDestroyedNotification as CFString, refcon)
@@ -293,10 +305,12 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
             }
         }
         self.list = list
+        let observed = DispatchTime.now().uptimeNanoseconds
         guard let snapshot = readSnapshot() else {
             detach()
             return false
         }
+        let read = DispatchTime.now().uptimeNanoseconds
         let (dockKids, dockError) = AXCall.children(dock)
         canCheckMembership = dockKids.contains { CFEqual($0, list) }
         if !canCheckMembership {
@@ -308,10 +322,15 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
         phase = .watching
         foundAt = DispatchTime.now().uptimeNanoseconds
         last = snapshot
+        let timing = """
+            observers \(Self.ms(observed &- began)), read \(Self.ms(read &- observed)) \
+            (\(itemTiming)), membership \(Self.ms(foundAt &- read))
+            """
         switcherLog.notice("""
             switcher found \(self.elapsedMs(since: self.startedAt), privacy: .public) ms after ⌘⇥, \
             check #\(self.checks, privacy: .public): \(snapshot.items.count, privacy: .public) apps, \
-            selected index \(snapshot.selectedIndex ?? -1, privacy: .public), \(self.mapping, privacy: .public)
+            selected index \(snapshot.selectedIndex ?? -1, privacy: .public), \(self.mapping, privacy: .public); \
+            \(timing, privacy: .public)
             """)
         deliver(.found(snapshot))
         schedule(every: SwitcherTiming.livenessInterval)
@@ -408,16 +427,22 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
     }
 
     private func readItems(_ kids: [AXUIElement]) -> (items: [RawSwitcherItem], complete: Bool) {
-        let apps = SwitcherRunningApp.all()
+        let started = DispatchTime.now().uptimeNanoseconds
+        let apps = prefetchedApps ?? SwitcherRunningApp.all()
+        prefetchedApps = nil
+        let appsRead = DispatchTime.now().uptimeNanoseconds
         var byURL = 0
         var byName = 0
         var complete = true
         let items = kids.map { kid -> RawSwitcherItem in
-            let (title, error) = AXCall.string(kid, kAXTitleAttribute)
-            let frame = AXCall.frame(kid)
-            if error != .success || frame == nil { complete = false }
-            let name = title ?? ""
-            let url = AXCall.fileURL(kid, kAXURLAttribute)
+            // One round trip per icon, since the stack edges wait for this read. Four took 20–25 ms
+            // for ten icons.
+            let (values, errors, _) = AXCall.values(
+                kid, [kAXTitleAttribute, kAXPositionAttribute, kAXSizeAttribute, kAXURLAttribute])
+            let frame = AXCall.frame(position: values[1], size: values[2])
+            if errors[0] != .success || frame == nil { complete = false }
+            let name = values[0] as? String ?? ""
+            let url = AXCall.fileURL(values[3])
             var pid = url.flatMap { SwitcherRunningApp.match(url: $0, in: apps) }
             if pid != nil {
                 byURL += 1
@@ -428,6 +453,7 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
             return RawSwitcherItem(pid: pid, name: name, frame: frame)
         }
         mapping = "pid by URL \(byURL), by name \(byName), unmatched \(items.count - byURL - byName)"
+        itemTiming = "apps \(Self.ms(appsRead &- started)), icons \(Self.ms(DispatchTime.now().uptimeNanoseconds &- appsRead))"
         switcherLog.debug("switcher items read: \(self.mapping, privacy: .public), complete \(complete, privacy: .public)")
         return (items, complete)
     }
@@ -452,6 +478,11 @@ nonisolated private final class SwitcherSession: AXObserverWorker {
 
     private func elapsedMs(since start: UInt64) -> Int {
         Int((DispatchTime.now().uptimeNanoseconds &- start) / 1_000_000)
+    }
+
+    /// Nanoseconds as milliseconds, to a tenth.
+    private static func ms(_ nanoseconds: UInt64) -> String {
+        String(format: "%.1f ms", Double(nanoseconds) / 1_000_000)
     }
 }
 
