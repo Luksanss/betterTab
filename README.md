@@ -19,7 +19,8 @@ apps. And the native ⌘⇥ switcher shows which apps have more than one window.
 It needs macOS 27.
 
 To update, choose Check for Updates… in BetterTab's menu. If there's a newer version, Install
-replaces the app and relaunches it, and the Accessibility permission carries over.
+Update replaces the app and relaunches it, and the Accessibility permission carries over. Updating
+this way works from the first version that has the menu item; install that one by hand.
 
 ## Use
 

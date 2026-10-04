@@ -39,8 +39,11 @@ ticket tracker; the next action below is the backlog.
   docs for updates.
 - **The installed app is v1.0.71** in `/Applications`, ad hoc like every release so far
   (`codesign -dv` says `Signature=adhoc`), because no secrets were set before release 6.
-- **A local test image:** `build/release/BetterTab-1.0.70.dmg`, ad hoc, from
-  `scripts/build-release.sh 1.0.70 70` with the final background. The version is a test number.
+- **A local test image:** `build/release/BetterTab-1.0.99.dmg`, ad hoc, from
+  `scripts/build-release.sh 1.0.99 99`, with Sparkle in it; the version is a test number. Beside
+  it, an `appcast.xml` and `notes.md` from `scripts/make-appcast.sh`, signed with a throwaway key:
+  the agent wrote that key's public half into the built app's Info.plist under
+  `build/release-DerivedData.noindex` to test the signature check, so that build isn't a real one.
   `build/dmgbuild` is the venv the script made, on Homebrew's Python 3.14.
 - **The Debug build** in `build/DerivedData.noindex` was rebuilt on 2026-10-04 by the `CLAUDE.md`
   check; its app code is release 5's.
@@ -73,14 +76,18 @@ ticket tracker; the next action below is the backlog.
    with the Apple Development certificate"; a wrong password or a `.p12` without its key fails
    the import step, and nothing is published. That release asks for Accessibility once more;
    later ones keep the grant.
-3. **Build the updater** (`docs/spec.md` § Updates, `docs/architecture.md` § Updates). First
-   decide what does it: [Sparkle](https://github.com/sparkle-project/Sparkle) (MIT), with an
-   EdDSA-signed appcast and its private key as a third secret, or a small updater of our own, with
-   no dependency but with the download check and the self-replacement written here, for an app that
-   holds Accessibility. The agent leans to Sparkle for that reason; it hasn't been discussed. Then:
-   the release workflow publishes and signs what the updater reads; any defaults the updater writes
-   go into spec § Privacy; and acceptance tests 20 and 21. **Don't release `dev` before it's built:**
-   the README already promises Check for Updates….
+3. **Finish the updater and ship it** (`docs/spec.md` § Updates, `docs/architecture.md`
+   § Updates). Built on Sparkle 2.10.0 on 2026-10-04: the menu item, `BetterTab/Info.plist`,
+   `scripts/make-appcast.sh` and the workflow steps. Left:
+   - **Sparkle's key.** The maintainer runs `generate_keys`, gives the agent the public key for
+     `SUPublicEDKey` (now the placeholder `SPARKLE_PUBLIC_KEY_PENDING`), and sets
+     `SPARKLE_ED_PRIVATE_KEY` in the `release` environment (`docs/releasing.md` § Updates). Until
+     both are in, a release fails at "Sign the update and write the appcast", safely.
+   - **Release it.** The first release with Sparkle is installed by hand and asks for Accessibility
+     once, being the first certificate-signed one. Its run summary should say "Signed with the
+     Apple Development certificate", and the release should carry `appcast.xml`.
+   - **Then acceptance test 20 needs a second release,** installed through Check for Updates….
+     Nobody has seen Sparkle's windows in BetterTab yet: Debug builds don't have the item.
 4. **Finish the docs for "only ⌘§"** (maintainer, 2026-10-04: "update readme and all according
    docs co reflect the new direction of only cmd + §"). The README, spec, product, architecture
    and `CLAUDE.md` already describe native ⌘⇥ with stack edges, plus ⌘§ (commit `0b62226`). Still
@@ -100,7 +107,7 @@ ticket tracker; the next action below is the backlog.
 7. **The maintainer runs acceptance tests 1–19 by hand** (`docs/spec.md`, renumbered on
    2026-10-01), especially 11 (⌘§ to a full-screen window, and whether another window flashes
    first), 16 (`kill -9` during ⌘§) and 17 (the first-launch prompt, seen only on a Debug build so
-   far). Tests 20 and 21, added on 2026-10-04, wait for the updater.
+   far). Tests 20 and 21, added on 2026-10-04, wait for two releases with the updater.
 8. **Still to discuss** (the maintainer said "we will discuss later" on 2026-09-30):
    - ⌘§ on ANSI keyboards, which have no § key (their key above Tab is ⌘`'s);
    - ⌘§'s order across Spaces (Findings).
@@ -112,14 +119,22 @@ ticket tracker; the next action below is the backlog.
   how, the maintainer chose:
   - **checking only when asked:** Check for Updates… in the menu, with no daily check, so
     BetterTab never goes online by itself (spec principle 5);
-  - **asking before installing:** a dialog with the version and release notes, Install and Not
-    Now, then download, check, replace and relaunch.
+  - **asking before installing:** a window with the version and release notes, then download,
+    check, replace and relaunch.
+  - **Sparkle** (maintainer: "let's build it with sparkle"), after the agent recommended it: its
+    code downloads, checks and replaces an app that holds Accessibility, and is better borrowed than
+    written. So the window's buttons are Sparkle's: Install Update, Remind Me Later and Skip This
+    Version, then Install and Relaunch.
   - Agent's calls, not discussed: Debug builds don't have the item, so a dev build never replaces
-    itself with a release; and a download is installed only after two checks, a signature only the
-    release workflow can make and the new app's code signature against the running app's
-    designated requirement (`docs/architecture.md` § Updates).
-  - Privacy still holds. The spec says what GitHub sees (the IP address and a user agent naming
-    the app's and macOS's versions), and the only file added is the download until it's installed.
+    itself with a release; `SUVerifyUpdateBeforeExtraction` makes the EdDSA signature mandatory
+    (Sparkle's default accepts either it or a matching code signature); the workflow refuses to
+    release without the certificate or Sparkle's key; the release notes are the `feat`, `fix` and
+    `perf` commits since the last release, for the GitHub release too, instead of GitHub's
+    generated list of pull requests titled "Dev"; the appcast isn't signed (HTTPS from GitHub,
+    `docs/architecture.md` § Updates).
+  - Privacy still holds. The spec says what GitHub sees (the IP address and `User-Agent:
+    BetterTab/<version> Sparkle/<version>`) and what Sparkle saves (`SUHasLaunchedBefore`,
+    `SULastCheckTime`, a skipped version).
   - It overturns "no automatic updates, because the app has no network code", from the releases
     decision below.
 - **Releases ship as a disk image, in English, with no zip** (maintainer, 2026-10-04). Shown
@@ -221,6 +236,34 @@ ticket tracker; the next action below is the backlog.
 - **No ticket tracker.**
 
 ## Findings worth keeping
+
+**From building the updater on Sparkle 2.10.0 (2026-10-04), read in its source:**
+- **Sparkle accepts an update that passes either check by default,** the EdDSA signature or a code
+  signature matching the running app, so either key can be rotated (`SUUpdateValidator.m`). With
+  `SUVerifyUpdateBeforeExtraction` the EdDSA check comes before unpacking and can't be skipped;
+  the only fallback is a Developer ID-signed archive. After unpacking, the new app's code signature
+  only has to be valid, not to match, so an ad hoc release would install and lose the grant.
+- **Skipped versions only filter background checks** (`SUAppcastDriver.m`), so Skip This Version
+  does nothing for BetterTab.
+- **Sparkle's defaults:** `SUHasLaunchedBefore` when its update cycle starts, `SULastCheckTime` per
+  check, skipped versions; `SUUpdateGroupIdentifier` only for phased rollouts. Setting
+  `SUEnableAutomaticChecks` in Info.plist stops it from ever asking about automatic checks.
+- **Its requests carry `User-Agent: <name>/<version> Sparkle/<version>`** and nothing else of ours
+  (`SPUUserAgent+Private.m`, `SPUDownloadDriver.m`).
+- **Markdown release notes** (`<description sparkle:format="markdown">`) are drawn by an
+  `NSTextView`, without WebKit. Sparkle activates the app for checks the user starts, so its window
+  comes forward from a menu-bar app.
+- **`sign_update --ed-key-file -` reads the key from stdin;** `generate_keys -x <file>` refuses a
+  path that exists, so it can't write to `/dev/stdout`. Without `--ed-key-file`, `sign_update`
+  uses the login keychain.
+- **Xcode re-signs the embedded `Sparkle.framework` with our team** on a plain `xcodebuild build`,
+  but its `Autoupdate` and `Updater.app` keep Sparkle's ad hoc signatures;
+  `codesign --verify --deep --strict` passes.
+- **Release tags sit on `main`'s merge commits, which `dev` can't reach,** so `git describe` on
+  `dev` finds no tag. On CI, `HEAD` is the new merge on `main`, whose first parent carries the
+  last tag.
+- **`gh release create` with files** makes a draft, uploads them, and then publishes (its
+  `--help`), so the latest release never lacks its appcast.
 
 **From bringing updates into scope (2026-10-04):**
 - **Ad hoc signing is why every install asks for Accessibility again,** not the way it's
@@ -375,7 +418,7 @@ Public APIs can't reliably focus one window. The API table is in `docs/architect
 
 - **Nobody has looked at the disk image's real Finder window** in light or dark mode; the design
   was approved from an offscreen preview (Next action 1).
-- **The updater isn't built;** the README, spec and the other docs describe it (Next action 3).
+- **The updater has never run:** it waits for Sparkle's key and two releases (Next action 3).
 - **No self-test run of the current scenarios is recorded** (Next action 6).
 - **Cross-Space focusing always logs a fallback,** although the picks work (Next action 5).
 - **New builds lose the Accessibility grant** despite the certificate signing (Findings).

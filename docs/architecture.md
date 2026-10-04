@@ -2,10 +2,9 @@
 
 BetterTab draws the stack edges over the native ⌘⇥ switcher and runs ⌘§, its own switcher for the
 front app's windows. Until 2026-10-01 it also held the native switcher open for a window list
-(route A+, § Route A+, removed). Its only network code is the update check (§ Updates, not built
-yet). Research was done on 2026-09-29. Anything marked **(verified)**
-was either read in the source of an app that ships the technique, or probed read-only on the dev
-machine (macOS 27.0, Xcode 27.0, Swift 6.4, arm64). The three apps are:
+(route A+, § Route A+, removed). Its only network code is the update check (§ Updates). Research
+was done on 2026-09-29. Anything marked **(verified)** was either read in the source of an app that
+ships the technique, or probed read-only on the dev machine (macOS 27.0, Xcode 27.0, Swift 6.4, arm64). The three apps are:
 
 - [AltTab](https://github.com/lwouis/alt-tab-macos), GPL-3.0;
 - [DockDoor](https://github.com/ejbills/DockDoor), GPL-3.0;
@@ -143,30 +142,47 @@ from day one, because the grant depends on it too.
 The app can't be sandboxed or ship on the App Store. Both rule out using Accessibility to control
 other apps and calling private APIs.
 
-## Updates (planned 2026-10-04)
+## Updates (added 2026-10-04)
 
-Not built yet; `docs/spec.md` § Updates says what it does. Which code does it is still open
-(`docs/handoff.md`, Next action): [Sparkle](https://github.com/sparkle-project/Sparkle) (MIT), the
-usual macOS updater, or a small one of our own. Either way:
-- **Only on request.** There's no timer, launch check or background check. The menu item starts the
-  one request, so idle stays at 0% CPU with no timers.
-- **Two checks before anything is replaced.** The download must carry a signature that only the
-  release workflow can make (such as Sparkle's EdDSA signature), and the new app's code signature
-  must satisfy the running app's designated requirement. The first proves the download came from
-  our release. The second proves macOS will treat it as the same app, so the Accessibility grant
-  carries over. A download that fails either is deleted.
+`docs/spec.md` § Updates says what it does. It's built on
+[Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0 (MIT), the usual macOS updater, as a
+Swift package pinned to that exact version. Its code downloads, checks and replaces an app that
+holds Accessibility, which is better borrowed from a well-tested project than written here.
+`BetterTab/App/Updater.swift` is the whole of our side; `BetterTab/Info.plist` holds Sparkle's
+settings and is merged into the generated Info.plist.
+- **Only on request.** `SUEnableAutomaticChecks` is NO, so Sparkle never checks or asks to, and
+  `SUAllowsAutomaticUpdates` NO removes its "install automatically" checkbox. The updater isn't
+  even created until Check for Updates… is chosen, so idle stays at 0% CPU with no timers. Release
+  builds only: Debug builds have no menu item, so a dev build never replaces itself.
+- **What has to match.** The release workflow signs the disk image with an EdDSA key, and the app
+  carries the public half (`SUPublicEDKey`). `SUVerifyUpdateBeforeExtraction` makes Sparkle check
+  that signature before it unpacks anything. Without it, Sparkle accepts an update that passes
+  *either* the EdDSA check or a code signature matching the running app, so that either key can be
+  rotated; with it, the EdDSA check is required, and the only fallback is a Developer ID-signed
+  disk image, which BetterTab doesn't make. After unpacking, the new app's code signature must be
+  valid (`SUUpdateValidator.m`).
 - **The grant follows the designated requirement.** A certificate-signed build's requirement names
   the certificate (`anchor apple generic and certificate leaf[subject.CN] = "Apple Development:
-  …"`), and an ad hoc build's is its cdhash, which every build changes. So updates keep the grant
-  only once releases are certificate-signed, and the first certificate-signed release still asks
-  once.
+  …"`), and an ad hoc build's is its cdhash, which every build changes. Sparkle would install a
+  validly signed update even if it were ad hoc, and the grant would be lost, so the release
+  workflow refuses to publish without the certificate. The first certificate-signed release still
+  asks once.
 - **Replacing the app.** BetterTab isn't sandboxed, and a copy dragged into `/Applications` belongs
-  to the user, so it can replace itself. The swap happens after BetterTab quits, which removes the
-  key tap first, and then the new copy is launched.
-- **Quarantine.** A non-sandboxed app's own downloads aren't quarantined unless it opts in, so
-  Gatekeeper shouldn't ask for Open Anyway again. Unverified on macOS 27 (acceptance test 20).
-- **Where updates come from.** The latest GitHub release, over HTTPS. The release workflow will have
-  to publish whatever the updater reads, and sign it (`docs/releasing.md` § Updates).
+  to the user, so Sparkle's `Autoupdate` helper can replace it. BetterTab quits first, which removes
+  the key tap, then the new copy is launched. Sparkle releases the new bundle from quarantine
+  (`SUPlainInstaller.m`), so Gatekeeper doesn't ask for Open Anyway again; unverified on macOS 27
+  (acceptance test 20).
+- **The feed.** `SUFeedURL` is `releases/latest/download/appcast.xml` on GitHub: each release
+  carries an appcast with one item, itself (`scripts/make-appcast.sh`). Its notes are Markdown,
+  which Sparkle draws in a text view, so no web page is loaded. The feed isn't signed: it's served
+  over HTTPS by GitHub, and anyone who could replace it could replace the release too.
+- **What it sends and saves.** Requests carry only `User-Agent: BetterTab/<version>
+  Sparkle/<version>`; `SUEnableSystemProfiling` is NO. Sparkle writes `SUHasLaunchedBefore`,
+  `SULastCheckTime` and any skipped version to BetterTab's defaults (spec § Privacy). Skipping
+  only filters automatic checks.
+- **Sparkle's helpers** (`Autoupdate`, `Updater.app`) keep Sparkle's ad hoc signatures inside the
+  framework, which Xcode re-signs with ours; `codesign --verify --deep --strict` passes. The XPC
+  services are only for sandboxed apps and go unused.
 
 ## Windows on every Space
 
