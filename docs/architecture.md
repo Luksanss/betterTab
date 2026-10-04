@@ -187,7 +187,9 @@ settings and is merged into the generated Info.plist.
   only filters automatic checks.
 - **Sparkle's helpers** (`Autoupdate`, `Updater.app`) keep Sparkle's ad hoc signatures inside the
   framework, which Xcode re-signs with ours; `codesign --verify --deep --strict` passes. The XPC
-  services are only for sandboxed apps and go unused.
+  services are only for sandboxed apps and go unused. The release script then signs the app again
+  without get-task-allow and leaves all of Sparkle as it is (`docs/releasing.md` § The app's
+  signature).
 
 ## Windows on every Space
 

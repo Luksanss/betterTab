@@ -1,13 +1,20 @@
 # Handoff
 
-Updated on 2026-10-04, after release 9. Release 9 went through pull request 9 at 11:36 UTC and
-published v1.0.88, as its handoff predicted. It merged `e5dd507`, the handoff written for it, so
-that handoff is archived at `docs/archive/handoffs/2026-10-04-ansi.md`, as the convention below
-says. The agent checked the published release: the app in the disk image is v1.0.88, signed by
-team `5KDU5HYH35` with a designated requirement naming the certificate, and passes `codesign
---verify --deep --strict`; the latest-release `appcast.xml` names it, with the notes "Wait for the
-Space slide before falling back to activate" and "Open the window switcher with ⌘\` on ANSI
-keyboards", and its EdDSA signature matches the `SUPublicEDKey` in that app.
+Updated on 2026-10-04, after release 9, once the release script stopped shipping
+`get-task-allow`. The maintainer found that releases carry `com.apple.security.get-task-allow =
+true`. Since BetterTab holds Accessibility, any process running as the user could attach a debugger
+and act with the grant. `e1dd4b3` makes `scripts/build-release.sh` sign the app again without it,
+and stop if any code in the app still has it (Decisions, Findings, `docs/releasing.md` § The app's
+signature). It's on `dev`, so release 10 is the first release without it.
+
+Release 9 went through pull request 9 at 11:36 UTC and published v1.0.88, as its handoff
+predicted. It merged `e5dd507`, the handoff written for it, so that handoff is archived at
+`docs/archive/handoffs/2026-10-04-ansi.md`, as the convention below says. The agent checked the
+published release: the app in the disk image is v1.0.88, signed by team `5KDU5HYH35` with a
+designated requirement naming the certificate, and passes `codesign --verify --deep --strict`; the
+latest-release `appcast.xml` names it, with the notes "Wait for the Space slide before falling back
+to activate" and "Open the window switcher with ⌘\` on ANSI keyboards", and its EdDSA signature
+matches the `SUPublicEDKey` in that app.
 
 Release 9 carries, since v1.0.81:
 - **A ⌘§ pick to another Space no longer logs a false "didn't switch"** or sends an `activate`
@@ -22,7 +29,8 @@ Spaces stays, and there's no LICENSE (Decisions). The handoffs of that day tell 
 
 The maintainer then updated to v1.0.88 through Check for Updates… at 13:40 and reported the checks
 done: ⌘§ opens the switcher on this Mac's ISO keyboard, and ⌘\` stays macOS's. Acceptance test 22
-counts as passed with the rest (Decisions), so the stack edges redesign is the only work left.
+counts as passed with the rest (Decisions), so the stack edges redesign is the only work left,
+besides releasing the `get-task-allow` fix.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because the
@@ -41,17 +49,24 @@ ticket tracker; the next action below is the backlog.
 
 - **`main`** is release 9, v1.0.88 (`09d2892`, the merge of pull request 9), published on
   2026-10-04. The local `main` was fast-forwarded to it.
-- **`dev`** is two commits ahead of `main`: `3179eef` (the release 9 archive) and this handoff.
-  `origin/dev` is at `e5dd507`; neither is pushed. Neither changes the app, so they can wait for
-  the next release.
+- **`dev`** is four commits ahead of `main`: `3179eef` (the release 9 archive), `6c6d1cf` (the
+  previous handoff), `e1dd4b3` (the `get-task-allow` fix) and this handoff. `origin/dev` is at
+  `6c6d1cf`; the last two aren't pushed. With nothing else landing, release 10 is v1.0.93: 88
+  commits on `main`, four on `dev` and the merge.
 - **The installed app is v1.0.88** in `/Applications`, certificate-signed (team `5KDU5HYH35`),
-  updated from v1.0.81 through Check for Updates… at 13:40, with Accessibility granted.
+  updated from v1.0.81 through Check for Updates… at 13:40, with Accessibility granted. It still has
+  `get-task-allow`, like every release so far.
 - **A local test image:** `build/release/BetterTab-1.0.99.dmg`, ad hoc, from
-  `scripts/build-release.sh 1.0.99 99`, with Sparkle in it; the version is a test number. Beside
-  it, an `appcast.xml` and `notes.md` from `scripts/make-appcast.sh`, signed with a throwaway key:
-  the agent wrote that key's public half into the built app's Info.plist under
-  `build/release-DerivedData.noindex` to test the signature check, so that build isn't a real one.
-  `build/dmgbuild` is the venv the script made, on Homebrew's Python 3.14.
+  `scripts/build-release.sh 1.0.99 99`, with Sparkle in it; the version is a test number. It
+  predates the fix, so it has `get-task-allow`. Beside it, an `appcast.xml` and `notes.md` from
+  `scripts/make-appcast.sh`, signed with a throwaway key: the agent wrote that key's public half
+  into the built app's Info.plist under `build/release-DerivedData.noindex` to test the signature
+  check, so that build isn't a real one. `build/dmgbuild` is the venv the script made, on Homebrew's
+  Python 3.14.
+- **The fix was made in a worktree,** `.claude/worktrees/vigilant-engelbart-9acf5a` (branch
+  `claude/vigilant-engelbart-9acf5a`, at the same commit as `dev`). Its `build/` has the fixed
+  script's last output: `BetterTab-1.0.99.dmg` signed with the maintainer's certificate. The worktree
+  and its branch can be deleted.
 - **The Debug build** in `build/DerivedData.noindex` has Sparkle linked but no Check for Updates….
   The resolved package, and Sparkle's tools (`generate_keys`, `sign_update`), are under its
   `SourcePackages/`; the tools are in `artifacts/sparkle/Sparkle/bin/`.
@@ -72,7 +87,15 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Redesign the stack edges, when the maintainer is ready** ("we will discuss that later"). First
+1. **Ship the `get-task-allow` fix as release 10, when the maintainer says so** (merge `dev` into
+   `main`). It's the first release whose app `codesign` signs directly rather than through Xcode.
+   Its notes will say "Keep other programs from attaching a debugger to BetterTab". Then check:
+   - the published app: `codesign -d --entitlements :-` prints nothing, its `codesign -d -r-`
+     matches v1.0.88's, and the release log lists every piece of code with "entitlements: none",
+     except `Autoupdate`'s `com.apple.application-identifier`;
+   - an update from v1.0.88 through Check for Updates… keeps the Accessibility grant, with no
+     prompt.
+2. **Redesign the stack edges, when the maintainer is ready** ("we will discuss that later"). First
    ask what looks funky: the edges themselves (their opacity, `rise`, `narrowing`, in Decisions),
    their place inside the highlight, or how they sit on some icons. Then compare variants
    offscreen, as on 2026-09-30 (Findings, the stack edges session), or write a brief for Claude
@@ -80,6 +103,24 @@ ticket tracker; the next action below is the backlog.
 
 ## Decisions already settled
 
+- **Releases are signed again without `get-task-allow`** (maintainer, 2026-10-04: "re-sign the app
+  inside-out with its own entitlements minus get-task-allow, using hardened runtime and no --deep.
+  Keep Sparkle's nested components signed as they need to be"). The maintainer ruled out
+  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`, which drops the other derived entitlements too, and
+  pointed to quickUschovna's `scripts/build-release.sh`, which reads each part's entitlements back,
+  deletes `get-task-allow` and signs again.
+  - **Only the app is signed again; Sparkle stays as Xcode leaves it** (agent's call). That's
+    `Sparkle.framework` signed with our identity and its helpers with Sparkle's ad hoc signatures,
+    as in every release, and two updates through the menu (releases 8 and 9) worked that way. None
+    of them has `get-task-allow`. Signing the helpers with our identity would change what replaces
+    the app during an update, and only a real update could test that.
+  - **Xcode still signs first, with the identity,** unlike quickUschovna, which builds ad hoc and
+    signs everything itself. The hardened runtime's library validation needs `Sparkle.framework` to
+    carry our team, and Xcode already does that.
+  - **The script stops** if any Mach-O in the app still has `get-task-allow`, or, with an identity,
+    if signing again changed the designated requirement, which would cost every user the grant
+    (agent's call).
+  - The commit is a `fix:`, so release 10's notes show it to users.
 - **The acceptance tests count as passed** (maintainer, 2026-10-04: "Consider the tests as
   passed"), for tests 1–21, and 22 after release 9 ("consider done"). The agent ran or measured
   1, 2, 5, 6, 8 (Esc), 15 and 18, and the maintainer ran the update in 20; the rest have no
@@ -238,6 +279,30 @@ ticket tracker; the next action below is the backlog.
 - **No ticket tracker.**
 
 ## Findings worth keeping
+
+**From the `get-task-allow` fix (2026-10-04, after release 9):**
+- **xcodebuild adds `get-task-allow` to Release builds** signed with an Apple Development identity
+  or ad hoc. The maintainer found it in v1.0.77 and both local Release builds; the agent saw it in
+  the installed v1.0.88. Sparkle's framework and helpers never had it.
+- **Signing again kept the designated requirement.** Built locally with the maintainer's identity
+  (`scripts/build-release.sh 1.0.99 99 <identity>`), the app's `codesign -d -r-` matched Xcode's
+  signature from the same build and the installed v1.0.88's. codesign used the login keychain's
+  key without a prompt, the same way xcodebuild's Debug builds do.
+- **Without entitlements, `codesign -d --entitlements :-` prints nothing,** and the code directory
+  has 3 special slots instead of 7 (`hashes=44+3`). Sparkle's helpers print an empty `<dict>`.
+- **The ad hoc run passed every check:** no `get-task-allow` in the app, the framework, `Autoupdate`,
+  `Updater.app` or either XPC service, in the build or in the app inside the disk image, and
+  `codesign --verify --strict --deep` passed on both.
+- **Testing `scripts/make-appcast.sh` without the real Sparkle key:** a throwaway Ed25519 seed from
+  CryptoKit (`Curve25519.Signing.PrivateKey().rawRepresentation`, base64) works as `sign_update
+  --ed-key-file -`. With the real `SUPublicEDKey` the check failed, as it should. With the throwaway
+  public half written into the built Info.plist it passed. Copying the original Info.plist back
+  made the app's seal valid again. The key was deleted.
+- **`file -b --mime-type` prints one line per architecture** for Sparkle's universal binaries, so
+  the script matches a prefix.
+- **`dev` is checked out in the main checkout, so a worktree can't switch to it.** The agent reset
+  the worktree's branch to `dev`, committed there, and fast-forwarded `dev` with `git -C
+  <main checkout> merge --ff-only`.
 
 **From release 9 (2026-10-04):**
 - **The release and its checks passed on the first run** (Actions run `37199297706`, 2 min 26 s),
@@ -450,7 +515,8 @@ ticket tracker; the next action below is the backlog.
 - **Every build gets registered as an app.** A folder ending in `.noindex` keeps Spotlight out.
   `lsregister -u <path>` removes a stale record.
 - **The release script was tested locally in both modes** when it made a zip; its disk image only
-  ad hoc (2026-10-04). The workflow's keychain import first ran for release 7, and worked.
+  ad hoc (2026-10-04), until the `get-task-allow` fix ran it with the certificate too. The
+  workflow's keychain import first ran for release 7, and worked.
 
 **From the 2026-09-30 build session, all on this Mac:**
 - **The self-test needs a multi-window home app,** or it skips almost everything. Safe targets:
@@ -486,6 +552,9 @@ Public APIs can't reliably focus one window. The API table is in `docs/architect
 
 ## Known gaps
 
+- **The `get-task-allow` fix hasn't run on CI or through an update.** It was checked locally, ad
+  hoc and with the maintainer's certificate (Findings). Installed copies up to v1.0.88 keep
+  `get-task-allow` until they update.
 - **Accepted as passed without a recorded run** (Decisions): "You're up to date!", a check with
   Wi-Fi off, and a day of test 21; the first-launch prompt on a release (test 17); whether another
   window flashes before the picked one (test 11); ⌘§'s `.hudWindow` material in light mode; ⌘\` on
@@ -515,3 +584,6 @@ decide what every installed copy accepts as an update.
   stays on, the workflow keeps refusing to release without both keys, and the keys stay in the
   `release` environment and the maintainer's keychain. Whoever holds Sparkle's key or the
   certificate can ship an app that inherits Accessibility (`docs/architecture.md` § Updates).
+- **Keep `get-task-allow` out of releases.** `scripts/build-release.sh` signs the app again without
+  it and stops if any code in the app still has it. Don't drop that step or add `--deep` to it
+  (`docs/releasing.md` § The app's signature).

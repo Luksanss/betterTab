@@ -49,6 +49,28 @@ that says what to do. The background is drawn by `design/dmg/make-background.swi
 - **The image isn't signed or notarized,** like the app, so the first launch still needs Open
   Anyway. The image only changes how installing looks.
 
+## The app's signature
+
+`scripts/build-release.sh` signs the app twice. Xcode signs it first, with the identity or ad hoc,
+and adds `com.apple.security.get-task-allow`, as it does to every build it signs that way, Release
+included. Every release up to v1.0.88 carries it (checked on 2026-10-04). It lets any process
+running as the user attach a debugger to BetterTab (`task_for_pid`) and act with its Accessibility
+grant. So the script signs the app again with the same identity, the entitlements Xcode gave it
+minus that one, and the hardened runtime.
+- **Only the app is signed again, and never with `--deep`.** The code nested in it is Sparkle's:
+  `Sparkle.framework`, which Xcode signs with our identity, and its helpers (`Autoupdate`,
+  `Updater.app` and the two XPC services), which keep Sparkle's ad hoc signatures. None of them has
+  get-task-allow, so they stay as every release has shipped them. `--deep` would sign the helpers
+  with the app's entitlements.
+- **Not `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`:** that would also drop the other entitlements
+  Xcode derives from the build settings. BetterTab has none today, and the script keeps any it gets.
+- **The script stops if** any Mach-O in the app still has get-task-allow, or if signing again
+  changed the designated requirement, which the Accessibility grant follows (`docs/architecture.md`
+  § Updates). It prints each piece of code's identifier, team, flags and entitlements, but not the
+  certificate's name, which holds an email address.
+- **To check an installed copy:** `codesign -d --entitlements :- /Applications/BetterTab.app`
+  prints nothing.
+
 ## Signing with your certificate
 
 The workflow refuses to release without the two secrets below. An ad-hoc build's designated
