@@ -12,7 +12,20 @@ real Finder window checked, and v1.0.81 back as "Active" with no permission prom
 Anyway, and Launch at Login unchanged. So the certificate signing does what it was for: an update
 keeps the grant. The rest of acceptance test 20, and test 21, are still to do (Next action 1).
 
-Nothing is waiting to be released: `dev` is one commit ahead of `main`, this handoff.
+Then the maintainer gave the agent the Mac for a few minutes ("the rest of the stuff which you can
+do alone, do it"), and said of the stack edges: "keep the stack edges, but the stack edges look a
+bit funky right now, so they will need to be redesigned" (Next action 2). In that time the agent:
+- **ran the self-test,** six times, all passing (Findings);
+- **found what the Space switch does:** the make-key record and the raise switch Space by
+  themselves, and the 300 ms wait gave up before the slide ended, so every cross-Space pick logged
+  "didn't switch" and sent an `activate` that did nothing. `Focuser` now waits up to a second, and
+  logs when a stuck window does come on screen (`8999b85`);
+- **measured acceptance test 18:** it passes (Findings);
+- **marked `docs/design-brief-v5.md` as historical,** which finishes the docs for "only ⌘§";
+- **removed the leftover release 4 worktree** and its branch, after `lsregister -u` on its builds.
+
+**Release 9** is `dev` now: the `Focuser` fix, the brief and the handoffs. If nothing else lands
+first, it's **v1.0.86**: the 81 commits on `main`, the four on `dev`, and the merge.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -32,11 +45,14 @@ ticket tracker; the next action below is the backlog.
 
 - **`main`** is release 8, v1.0.81 (`5510bbb`, the merge of pull request 8), published on
   2026-10-04. The local `main` was fast-forwarded to it in this session.
-- **`dev`** is one commit ahead of `main`: this handoff. `origin/dev` is at `dcc9c00`; this commit
-  isn't pushed.
+- **`dev`** is four commits ahead of `main`: `6530326` (the release 8 archive), `8999b85`
+  (`Focuser`), `7d27c4b` (the v5 brief) and this handoff. `origin/dev` is at `dcc9c00`; none of
+  the four is pushed.
 - **The installed app is v1.0.81** in `/Applications`, certificate-signed (team `5KDU5HYH35`),
-  updated from v1.0.77 through Check for Updates… and running since 12:50, with Accessibility
-  granted.
+  updated from v1.0.77 through Check for Updates… at 12:50, with Accessibility granted. The agent
+  quit it for the self-test and relaunched it at 13:19.
+- **Three scratch TextEdit documents** from the self-test may still be open; they're unmodified
+  files in the session scratchpad, so close them without saving.
 - **A local test image:** `build/release/BetterTab-1.0.99.dmg`, ad hoc, from
   `scripts/build-release.sh 1.0.99 99`, with Sparkle in it; the version is a test number. Beside
   it, an `appcast.xml` and `notes.md` from `scripts/make-appcast.sh`, signed with a throwaway key:
@@ -46,10 +62,6 @@ ticket tracker; the next action below is the backlog.
 - **The Debug build** in `build/DerivedData.noindex` has Sparkle linked but no Check for Updates….
   The resolved package, and Sparkle's tools (`generate_keys`, `sign_update`), are under its
   `SourcePackages/`; the tools are in `artifacts/sparkle/Sparkle/bin/`.
-- **A leftover worktree:** `.claude/worktrees/relaxed-swanson-940c4a` on branch
-  `claude/relaxed-swanson-940c4a`, from the release 4 task session, at `4edefd8`. Its Debug and
-  Release builds are registered with Launch Services, so run `lsregister -u` on both `.app`s under
-  its `build/DerivedData.noindex/Build/Products/` before `git worktree remove` and `git branch -D`.
 - **Dev builds** go to `build/DerivedData.noindex`. The `CLAUDE.md` check builds the one scheme,
   BetterTab, and passes. The only `warning:` lines are xcodebuild's "Using the first of multiple
   matching destinations" and, sometimes, `appintentsmetadataprocessor`'s "Metadata extraction
@@ -71,34 +83,35 @@ ticket tracker; the next action below is the backlog.
    "You're up to date!" (v1.0.77 couldn't show it: v1.0.81 was out before the maintainer
    checked), and with Wi-Fi off it should say it couldn't check, and nothing changes. Test 21: over
    a day of use without choosing Check for Updates…, a network monitor shows no connections from
-   BetterTab.
-2. **Finish the docs for "only ⌘§"** (maintainer, 2026-10-04: "update readme and all according
-   docs co reflect the new direction of only cmd + §"). The README, spec, product, architecture
-   and `CLAUDE.md` already describe native ⌘⇥ with stack edges, plus ⌘§ (commit `0b62226`). Still
-   wrong: `docs/design-brief-v5.md`, the brief for the ⌘⇥ window list. First ask whether "only ⌘§"
-   means the stack edges go too: they stayed on 2026-10-01, and removing them is a code change.
-3. **Find out what the Space switch in `BetterTab/Focus/Focuser.swift` really does.** Every
-   cross-Space pick on 2026-09-30 logged "space didn't switch" after its 300 ms wait and fell back
-   to `activate`, yet the maintainer says those picks work, ⌘§'s between two full-screen windows
-   included. Measure when the Space actually changes, make the log say what happened, and see
-   whether a pick can take less than the ~330 ms before the fallback plus the slide.
-4. **Run the self-test** when the Mac is free: `open -g …/Debug/BetterTab.app --args --self-test
-   /abs/path/report.json`. No run of the current scenarios is recorded: `native-single`,
-   `native-multi` (`BetterTab/Debug/SelfTestScenarios.swift`), and `windows-flip`, `windows-escape`
-   and `windows-cycle` (`BetterTab/Debug/SelfTestWindowScenarios.swift`). The app in front is home
-   and needs two windows, three for `windows-cycle`; scratch TextEdit documents work. `native-multi`
-   needs another app with two or more windows, and `native-single` one with exactly one.
-5. **The maintainer runs acceptance tests 1–19 by hand** (`docs/spec.md`, renumbered on
-   2026-10-01), especially 11 (⌘§ to a full-screen window, and whether another window flashes
-   first), 16 (`kill -9` during ⌘§) and 17 (the first-launch prompt, seen only on a Debug build so
-   far).
-6. **Still to discuss** (the maintainer said "we will discuss later" on 2026-09-30):
+   BetterTab. A minute of it is done (Findings), and Info.plist has `SUEnableAutomaticChecks` off.
+2. **Redesign the stack edges** (maintainer, 2026-10-04, quoted above). First ask what looks funky:
+   the edges themselves (their opacity, `rise`, `narrowing`, in Decisions), their place inside
+   the highlight, or how they sit on some icons. Then compare variants offscreen, as on
+   2026-09-30 (Findings, the stack edges session), or write a brief for Claude Design like v6.
+3. **Release 9.** When the maintainer says `dev` works, they push it, open the pull request and
+   merge it. Then Check for Updates… in v1.0.81 should offer it with the note "Wait for the Space
+   slide before falling back to activate". A ⌘§ pick to another Space should still slide there,
+   and `log stream --info --predicate 'subsystem == "com.luksanss.BetterTab"'` should say "space
+   switched", with no "fell back".
+4. **The maintainer runs the rest of acceptance tests 1–19 by hand.** The self-test covers native
+   ⌘⇥ (1), the stack edges' frames (2), the ⌘§ flip (5), cycling (6), Esc (8) and ⌘ not stuck
+   (15), and 18 was measured, so what's left is 3, 4, 7, letters (8), 9–14, 16, 17 and 19. Most
+   important: 11 (whether another window flashes before a full-screen one; the slide itself
+   works), 16 (`kill -9` during ⌘§) and 17 (the first-launch prompt, seen only on a Debug build).
+5. **Still to discuss** (the maintainer said "we will discuss later" on 2026-09-30):
    - ⌘§ on ANSI keyboards, which have no § key (their key above Tab is ⌘`'s);
    - ⌘§'s order across Spaces (Findings).
-7. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
+6. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
 
 ## Decisions already settled
 
+- **The stack edges stay, and get a redesign** (maintainer, 2026-10-04: "No, keep the stack edges,
+  but the stack edges look a bit funky right now, so they will need to be redesigned"), when asked
+  whether "only ⌘§" meant they go too. So "only ⌘§" was about the docs, which are done.
+- **A Space switch counts as stuck after a second, not 300 ms** (agent's call, 2026-10-04, from the
+  measurements in Findings). The slide takes 370–410 ms, and a second leaves room for a busier
+  Mac. Only `activate` waits longer, and only for a switch that really is stuck; a pick queued
+  behind another waits for the slide, about 100 ms longer than before.
 - **Updates are in scope, but only on request** (maintainer, 2026-10-04; quotes above). Asked
   how, the maintainer chose:
   - **checking only when asked:** Check for Updates… in the menu, with no daily check, so
@@ -232,6 +245,26 @@ ticket tracker; the next action below is the backlog.
 
 ## Findings worth keeping
 
+**From the self-test and the Space switch (2026-10-04, after release 8):**
+- **Six self-test runs, all passing.** At 13:16, with TextEdit ×3 as home, Claude as the
+  multi-window app and Messages as the single: all 8 scenarios in 7 s. Then five runs with Chrome
+  as home, whose two windows (SkyLight's count) are on full-screen Spaces: 7 pass each, and
+  `windows-cycle` is skipped for having fewer than three windows.
+- **The make-key record and the raise switch Space; `activate` never did.** Five ⌘§ picks between
+  Chrome's full-screen windows came on screen 373–407 ms after the raise: 379 and 384 ms with the
+  fallback skipped (a Debug-only switch, removed after the test), and 373, 397 and 407 ms with
+  `activate` sent at about 310 ms. SkyLight changes a display's current Space when the slide ends,
+  not when it starts. With the one-second wait, run 6 logged "space switched" at about 375 ms.
+- **A pick can't get much faster.** Front, make-key and raise take 10–35 ms; the rest is macOS's
+  slide.
+- **Idle (acceptance test 18) passes.** Over 60 s, v1.0.81 used 0.00 s of CPU (`ps -o time`) and
+  14 MB, with no idle wakeups (`top -stats idlew`) and no sockets in 30 `lsof -i` samples.
+- **Fresh Debug builds kept the grant.** Both rebuilt Debug builds came up "Active" for the
+  self-test, which stops otherwise, with the certificate-signed release installed.
+- **With the maintainer's go-ahead in chat, auto mode let the agent `kill -TERM` the installed
+  BetterTab and `open -g` both builds,** unlike on 2026-09-30.
+- **Chrome as home:** `open -a "Google Chrome"`, wait two seconds, then `open -g` the Debug app.
+
 **From release 8 (2026-10-04):**
 - **An update through the menu keeps the Accessibility grant.** v1.0.77 and v1.0.81 are both signed
   by team `5KDU5HYH35` with the same designated requirement, and the maintainer saw no permission
@@ -347,6 +380,7 @@ ticket tracker; the next action below is the backlog.
   maintainer's two ⌘§ picks between two full-screen windows both logged it and fell back to
   `activate` after about 335 ms, and the maintainer says ⌘§ works. Either the 300 ms wait gives
   its verdict before the Space has moved, or `activate` does more for the front app than assumed.
+  It was the first (measured on 2026-10-04, above).
 - **System Settings has one Accessibility row per bundle ID, with the icon of the copy in
   `/Applications`.** Several copies are registered as `com.luksanss.BetterTab`: the release in
   `/Applications`, and the Debug and Release builds in the checkout and in the worktree. With a
@@ -358,7 +392,8 @@ ticket tracker; the next action below is the backlog.
 - **New Debug builds lost the grant twice; relaunching the same build kept it.** The Debug build's
   designated requirement names the certificate (`anchor apple generic and certificate
   leaf[subject.CN] = "Apple Development: …"`), which should survive rebuilds. The cause is unknown.
-  The suspect is the one TCC record all the copies share.
+  The suspect is the one TCC record all the copies share. On 2026-10-04, with a certificate-signed
+  release installed, two fresh Debug builds kept it.
 - **The agent's shell may not quit or launch BetterTab.** Claude Code's auto-mode check refused
   both `kill -TERM` and `open -g` on the app ("Interfere With Workloads"). Ask the maintainer to run
   them. With `TapSignals` gone, `kill -TERM` simply ends the process; nothing is owed.
@@ -444,12 +479,10 @@ Public APIs can't reliably focus one window. The API table is in `docs/architect
 
 ## Known gaps
 
-- **"You're up to date!", a check with Wi-Fi off, and test 21 are unseen** (Next action 1).
-- **No self-test run of the current scenarios is recorded** (Next action 4).
-- **Cross-Space focusing always logs a fallback,** although the picks work (Next action 3).
-- **New Debug builds lost the Accessibility grant twice on 2026-09-30,** despite the certificate
-  signing (Findings). A release kept it through an update; whether Debug builds still lose it
-  isn't known.
+- **"You're up to date!", a check with Wi-Fi off, and a day of test 21 are unseen** (Next
+  action 1).
+- **The `Focuser` fix is only in Debug builds so far** (Next action 3).
+- **`windows-cycle` hasn't run across Spaces:** Chrome had two windows.
 - **Whether ⌘§'s `.hudWindow` material looks right in light mode is unseen.**
 - **The first-launch prompt is unconfirmed for a release** (acceptance test 17); it has been seen
   on a Debug build.
