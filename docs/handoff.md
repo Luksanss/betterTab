@@ -1,11 +1,13 @@
 # Handoff
 
-Updated on 2026-10-04, after release 9, once the release script stopped shipping
-`get-task-allow`. The maintainer found that releases carry `com.apple.security.get-task-allow =
-true`. Since BetterTab holds Accessibility, any process running as the user could attach a debugger
-and act with the grant. `e1dd4b3` makes `scripts/build-release.sh` sign the app again without it,
-and stop if any code in the app still has it (Decisions, Findings, `docs/releasing.md` § The app's
-signature). It's on `dev`, so release 10 is the first release without it.
+Updated on 2026-10-04, after release 9: the release script stopped shipping `get-task-allow`, and
+the stack edges redesign settled on a direction, a window count (below).
+
+The maintainer found that releases carry `com.apple.security.get-task-allow = true`. Since
+BetterTab holds Accessibility, any process running as the user could attach a debugger and act with
+the grant. `e1dd4b3` makes `scripts/build-release.sh` sign the app again without it, and stop if
+any code in the app still has it (Decisions, Findings, `docs/releasing.md` § The app's signature).
+It's on `dev`, so release 10 is the first release without it.
 
 Release 9 went through pull request 9 at 11:36 UTC and published v1.0.88, as its handoff
 predicted. It merged `e5dd507`, the handoff written for it, so that handoff is archived at
@@ -32,6 +34,15 @@ done: ⌘§ opens the switcher on this Mac's ISO keyboard, and ⌘\` stays macOS
 counts as passed with the rest (Decisions), so the stack edges redesign is the only work left,
 besides releasing the `get-task-allow` fix.
 
+**The stack edges redesign started that afternoon.** The maintainer showed the real switcher in a
+screenshot: v7's edges are 4 pt dark slivers that read as smudges on macOS 27's clear glass ("kinda
+ugly and not really noticable"). Claude Design first brought the prototype up to date as `Window
+Switcher v7.dc.html`, which matches v1.0.88, then built three directions in `Window Switcher
+v8.dc.html` from the brief in `docs/design-brief-v8.md`: A "Spine", B "Chips" and C "Count", each
+with a spec sheet. The maintainer picked A. The agent built it, but on offscreen renders with the
+real icons the maintainer dropped it ("nah lets do the count, this is shi"). Spine is in a stash,
+not on `dev` (Working copy state); C, "Count", is next, in a fresh session (Next action).
+
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because the
 maintainer says a version works. At that point it's copied to `docs/archive/handoffs/<ISO date>.md`
@@ -49,10 +60,18 @@ ticket tracker; the next action below is the backlog.
 
 - **`main`** is release 9, v1.0.88 (`09d2892`, the merge of pull request 9), published on
   2026-10-04. The local `main` was fast-forwarded to it.
-- **`dev`** is four commits ahead of `main`: `3179eef` (the release 9 archive), `6c6d1cf` (the
-  previous handoff), `e1dd4b3` (the `get-task-allow` fix) and this handoff. `origin/dev` is at
-  `6c6d1cf`; the last two aren't pushed. With nothing else landing, release 10 is v1.0.93: 88
-  commits on `main`, four on `dev` and the merge.
+- **`dev`** is five commits ahead of `main`: `3179eef` (the release 9 archive), `6c6d1cf` (a
+  handoff), `e1dd4b3` (the `get-task-allow` fix), `e014a18` (its handoff) and this handoff, which
+  adds `docs/design-brief-v8.md`. `origin/dev` is at `e014a18` as of the last fetch; this one isn't
+  pushed. With nothing else landing, release 10 is v1.0.94: 88 commits on `main`, five on `dev` and
+  the merge.
+- **The Spine stack edges are in `stash@{0}`** ("Spine stack edges (Claude design v8, direction
+  A), dropped 2026-10-04 for Count"), not on `dev`, so release 10 can't ship them. It holds
+  `BetterTab/StackEdges/IconColour.swift` (icon colours in Oklab), the rewritten
+  `StackEdgesOverlay.swift`, its call sites, the self-test check, and the spec and architecture
+  text. Worth taking for Count: `bodyScale = 104.0 / 128` (Findings), the `Icon` struct, the
+  static `draw(_:isDark:in:)` an offscreen harness can call, and the shape of the self-test's
+  geometry check. `git stash show -p stash@{0}` shows it; drop it once Count lands.
 - **The installed app is v1.0.88** in `/Applications`, certificate-signed (team `5KDU5HYH35`),
   updated from v1.0.81 through Check for Updates… at 13:40, with Accessibility granted. It still has
   `get-task-allow`, like every release so far.
@@ -67,7 +86,8 @@ ticket tracker; the next action below is the backlog.
   `claude/vigilant-engelbart-9acf5a`, at the same commit as `dev`). Its `build/` has the fixed
   script's last output: `BetterTab-1.0.99.dmg` signed with the maintainer's certificate. The worktree
   and its branch can be deleted.
-- **The Debug build** in `build/DerivedData.noindex` has Sparkle linked but no Check for Updates….
+- **The Debug build** in `build/DerivedData.noindex` was rebuilt from `dev` after the stash, so it
+  draws v7's edges, not Spine. It has Sparkle linked but no Check for Updates….
   The resolved package, and Sparkle's tools (`generate_keys`, `sign_update`), are under its
   `SourcePackages/`; the tools are in `artifacts/sparkle/Sparkle/bin/`.
 - **Dev builds** go to `build/DerivedData.noindex`. The `CLAUDE.md` check builds the one scheme,
@@ -95,14 +115,37 @@ ticket tracker; the next action below is the backlog.
      except `Autoupdate`'s `com.apple.application-identifier`;
    - an update from v1.0.88 through Check for Updates… keeps the Accessibility grant, with no
      prompt.
-2. **Redesign the stack edges, when the maintainer is ready** ("we will discuss that later"). First
-   ask what looks funky: the edges themselves (their opacity, `rise`, `narrowing`, in Decisions),
-   their place inside the highlight, or how they sit on some icons. Then compare variants
-   offscreen, as on 2026-09-30 (Findings, the stack edges session), or write a brief for Claude
-   Design like v6.
+2. **Build the stack edges as v8's direction C, "Count", in a fresh session** (Decisions). Read
+   `Window Switcher v8.dc.html` through `DesignSync` (`get_file`, project
+   `3de20039-32b6-469c-a83f-98c761ed286e`); its "Stack edges" control (or the 4 key) shows C, and
+   "Spec sheet" shows the numbers. In shares of `s`, the icon body's side, origin the body's
+   top-left, y down:
+   - **Capsule:** height 0.26, width max(0.26, digits × 0.099 + 0.14), radius 0.13; left x =
+     −0.02, top y = 0.76, growing rightward. The bottom-left corner, where Finder puts its alias
+     arrow.
+   - **Numeral:** the exact window count, 2 and up with no ceiling, in SF Pro Rounded Semibold at
+     0.165, tabular figures, optically centred 0.005 down.
+   - **Fill / text:** #FFFFFF / #1D1D1F in light, #3A3A3C / #F5F5F7 in dark.
+   - **Rim, 0.005 wide:** #000 at 10% in light, #FFF at 14% in dark.
+   - **Shadow:** y 0.01, blur σ 0.015, #000 at 22% in light, 50% in dark.
+
+   The design took `s` as 103 pt; it's 104 (Findings). Then update `docs/spec.md` § ⌘⇥: stack
+   edges and acceptance test 2, `docs/architecture.md`'s geometry paragraph and component row, the
+   self-test's `stackEdgeProblems` (a capsule at the bottom left, not edges above),
+   `StackEdgesOverlay.maxEdges` (a count has no ceiling) and the header of
+   `docs/design-brief-v8.md`. Render it offscreen with real icons before the maintainer tries it
+   (Findings), and put nothing on screen without asking.
 
 ## Decisions already settled
 
+- **The stack edges become a window count, v8's direction C** (maintainer, 2026-10-04). v7's
+  edges were "kinda ugly and not really noticable" on the real switcher. Of v8's three directions
+  the maintainer first chose A, "Spine": the other windows as cards slid out to the icon's left,
+  in the icon's colour, with C as the fallback ("lets first do the spine, if that fails we will do
+  count"). Spine was built and rendered offscreen with the real icons, then dropped: "nah lets do
+  the count, this is shi". B, "Chips" (a row of window frames above the icon), wasn't taken up.
+  Claude Design had recommended A, then B, and warned that C puts a second badge on an app that
+  has a notification badge, such as Discord.
 - **Releases are signed again without `get-task-allow`** (maintainer, 2026-10-04: "re-sign the app
   inside-out with its own entitlements minus get-task-allow, using hardened runtime and no --deep.
   Keep Sparkle's nested components signed as they need to be"). The maintainer ruled out
@@ -238,9 +281,9 @@ ticket tracker; the next action below is the backlog.
   hand. `design/icon/AppIcon.png` is the Default rendition at 512 px for the README; re-export it
   when the icon changes (`design/icon/README.md`).
 - **Stack edges: bolder, still inside the highlight** (maintainer asked for bolder, then approved,
-  2026-09-30). Opacity `[0.85, 0.55]` dark and `[0.62, 0.40]` light (front, back); `rise` 0.041 of
-  the body's side, `narrowing` 0.10. Variant C (`rise` 0.052, poking above the highlight) wasn't
-  needed.
+  2026-09-30). What ships until Count replaces it. Opacity `[0.85, 0.55]` dark and `[0.62, 0.40]`
+  light (front, back); `rise` 0.041 of the body's side, `narrowing` 0.10. Variant C (`rise` 0.052,
+  poking above the highlight) wasn't needed.
 - **Stack edges replace the window-count dots** (maintainer, 2026-09-29). The dots were too close
   to the Dock's "running" dots. The top-centred stack beat the diagonal one, which looked like a
   Copy icon. One edge for two windows, two for three or more.
@@ -279,6 +322,31 @@ ticket tracker; the next action below is the backlog.
 - **No ticket tracker.**
 
 ## Findings worth keeping
+
+**From the stack edges redesign (2026-10-04, after release 9):**
+- **The real switcher's glass is nearly clear on macOS 27:** text behind it shows through (the
+  maintainer's screenshot). v7's frosted mock flattered thin grey marks; v8's mock copies the
+  screenshot.
+- **Switcher icons have a 104 pt body, not 103.** NSWorkspace icons drawn at 128 and 256 px put
+  the body at 12.0–116.0 pt of the 128 pt frame, for all eleven apps tried; only the 1024 px
+  rendition matches 824/1024. That explains the highlight's top sitting 8 pt above the body, not
+  8.5 (stack edges session, 2026-09-30). `StackEdgesOverlay.bodyScale` on `dev` is still
+  824/1024; the stash has 104/128.
+- **Reading icon colours, if a design ever needs them:** the first `NSRunningApplication.icon` read
+  is slow when cold, up to 56 ms (GitHub Desktop) and 127 ms for ten apps, so read ahead at launch.
+  A mean of the icon's left column made Calendar's cards pink from its red header; a per-channel
+  median in Oklab gave its white. Count needs no icon colours.
+- **Rendering the overlay offscreen with real icons:** compile `StackEdges/StackEdgesOverlay.swift`
+  and `App/OverlayPanel.swift` (without `-D DEBUG`) with a `main.swift`, using `xcrun swiftc
+  -swift-version 6 -default-isolation MainActor -enable-upcoming-feature InferIsolatedConformances
+  -enable-upcoming-feature NonisolatedNonsendingByDefault -framework AppKit`. Draw a stand-in
+  switcher and the overlay into a CGContext bitmap at 2×, so icons use their 256 px rendition, and
+  write PNGs. No window and no `open`. It needs the drawing as a static function, as in the stash;
+  on `dev` it's inside a private view.
+- **Clipping to a path and then filling the same path antialiases its edge twice,** so the edge
+  sits about 0.1 pt in. Fill the path, and clip only what has to stay inside it.
+- **v8 has a spec sheet per direction** (its "Spec sheet" control), read through `DesignSync` like
+  v6. Those numbers are what to build.
 
 **From the `get-task-allow` fix (2026-10-04, after release 9):**
 - **xcodebuild adds `get-task-allow` to Release builds** signed with an Apple Development identity
