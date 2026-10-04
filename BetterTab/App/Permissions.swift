@@ -27,10 +27,10 @@ final class AccessibilityPermission: NSObject {
         promptOnFirstLaunch()
     }
 
-    /// Shows the system prompt and opens Privacy & Security → Accessibility.
+    /// Opens Privacy & Security → Accessibility, without the system prompt: that only put a second
+    /// dialog in front of the same switch.
     func requestAccess() {
-        logger.info("Requesting Accessibility access")
-        showSystemPrompt()
+        logger.info("Opening Accessibility settings")
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
