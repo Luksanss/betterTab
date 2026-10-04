@@ -5,9 +5,10 @@ Written on 2026-10-04 for Claude Design. Project: "Mac Window Switcher Prototype
 stack edges as built, ⌘§ direction 3 only, the current menu). The maintainer judged the stack edges
 on a screenshot of the real switcher as "kinda ugly and not really noticable". Claude Design built
 three directions in `Window Switcher v8.dc.html`, with a spec sheet for each: A "Spine", B "Chips"
-and C "Count". The maintainer chose A, with C as the fallback. A was built, and dropped on
-offscreen renders ("nah lets do the count, this is shi"), so C is next (`docs/handoff.md`). This
-brief is kept as the record of what was asked for.
+and C "Count". The maintainer chose A, with C as the fallback. A was built first, and dropped on
+offscreen renders ("nah lets do the count, this is shi"). C was built on 2026-10-04, and
+`docs/spec.md` § ⌘⇥: stack edges now describes what was built. This brief is kept as the record of
+what was asked for. Its 103 pt body is 104 pt on the real switcher (`docs/architecture.md`).
 
 ---
 

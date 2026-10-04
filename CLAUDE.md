@@ -2,7 +2,7 @@
 
 A macOS menu-bar utility. ⌘§ (the key above Tab: § on ISO keyboards, ` on ANSI ones) is ⌘⇥ for the
 front app's windows, drawn by BetterTab itself, windows on other Spaces included. ⌘⇥ stays native:
-BetterTab only draws stack edges behind the icons of apps with more than one window. Until
+BetterTab only draws a window count on the icons of apps with more than one window. Until
 2026-10-01, releasing ⌘⇥ on such an app opened a window list; that was removed (`docs/spec.md` § Out
 of scope). It updates itself from GitHub through Sparkle, but only when the user chooses Check for
 Updates… in the menu (`docs/spec.md` § Updates). See `docs/handoff.md` for where testing stands.

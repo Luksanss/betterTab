@@ -31,7 +31,7 @@ long as its copyright notice is kept.
 |---|---|
 | `SwitcherWatcher` | On ⌘⇥, find the Dock's `AXProcessSwitcherList`. Read each child's frame and match it to an app. Report changes, and when the list is destroyed. |
 | `WindowIndex` | Read apps' real windows on every Space: SkyLight gives the windows and counts in about 1 ms per app, then AX adds titles and drops windows that aren't standard ones, in parallel, with a 250 ms timeout. While cycling it reads every regular app, so the counts are ready when the switcher appears. |
-| `StackEdgesOverlay` | A transparent, click-through panel above the native switcher. Behind each multi-window icon it draws the top edges of one or two more windows, from the icon's AX frame. |
+| `StackEdgesOverlay` | A transparent, click-through panel above the native switcher. On each multi-window icon it draws the window count in a capsule on the body's bottom-left corner, from the icon's AX frame (design v8, direction C). |
 | `KeyTap` | A session-level `CGEvent` tap; details below. |
 | `WindowSwitcher` | ⌘§'s own panel: one tile per window with its outline (design v6, direction 3). See § ⌘§. |
 | `Focuser` | Bring one specific window to the front and make it key. |
@@ -39,12 +39,36 @@ long as its copyright notice is kept.
 
 **The switcher's geometry on macOS 27** (measured on 2026-09-30 from a screenshot and the AX
 frames, with five apps). The switcher is 712 × 176 pt. Each icon's AX frame is 128 pt, and the
-icon image fills it, so the visible rounded square is 103 pt (Apple's icon grid: an 824 pt body
-on a 1024 pt canvas). Icons are 6 pt apart, with 24 pt of padding around them. The Dock's
+icon image fills it. Icons are 6 pt apart, with 24 pt of padding around them. The Dock's
 highlight is the frame inset by 4 pt, and the app's name sits just below the frame, where the old
-dots were. That leaves 8.5 pt between the body and the highlight's top, and two stack edges rise
-about 8.4 pt, filling it. The self-test notes these frames in its `stack-edges` scenario and fails
-edges that come within 4 pt of the frame's top.
+dots were. The visible rounded square, the body, is 104 pt (`bodyScale`, measured 2026-10-04):
+Apple's icon grid draws an 824 pt body on a 1024 pt canvas, but the 128 and 256 px renditions the
+switcher draws snap it to 104 of 128. So the highlight's top is 8 pt above the body, as a
+screenshot showed on 2026-09-30, not the 8.5 pt that 824/1024 predicts.
+
+**The count** (design v8, direction C, built 2026-10-04) is drawn from the body, which comes from
+the AX frame. Every size is a share of `s`, the body's side, so the count shrinks with the icons.
+The capsule is 0.26 s tall and max(0.26, digits × 0.099 + 0.14) s wide, fully rounded, with its
+left side and bottom 0.02 s past the body's, so it hangs off the corner as a badge does and grows
+rightward. The number is SF Pro Rounded Semibold at 0.165 s, in tabular figures, centred and then
+0.005 s lower, which reads as centred. At full size that's a 27 pt circle for one digit, 35 pt
+wide for two, with a 17 pt numeral. The rim is 0.005 s wide, on the capsule's edge, so a white
+capsule on white glass still has an outline. The shadow drops 0.01 s, with a Gaussian σ of
+0.015 s (Core Graphics' `blur` is 2σ, measured on macOS 27).
+
+| | Light | Dark |
+|---|---|---|
+| Fill | #FFFFFF | #3A3A3C |
+| Number | #1D1D1F | #F5F5F7 |
+| Rim | black at 10% | white at 14% |
+| Shadow | black at 22% | black at 50% |
+
+The drawing is the static `StackEdgesOverlay.draw(_:isDark:in:)`, so an offscreen harness can
+render it with real icons and nothing on screen (`docs/handoff.md`, Findings). The self-test notes
+the frames in its `stack-edges` scenario. It fails an icon that doesn't show its exact window count
+(none below two), or whose capsule isn't on the body's bottom-left corner (its left side and bottom
+0.02 s past the body's, give or take 0.03 s) and inside the highlight, the frame inset by 4 pt at
+128 pt and scaled for smaller icons.
 
 **The native switcher's window** is Dock-owned, full-screen, at layer 20; the overlay panels sit
 at `.screenSaver`. The `AXProcessSwitcherList` is a direct child of the Dock's app element, found
