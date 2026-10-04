@@ -3,6 +3,11 @@
 Given to Claude Design on 2026-09-29. Project: "Mac Window Switcher Prototype". Base:
 `Window Switcher v4.dc.html`. The behaviour it has to match is `docs/spec.md`.
 
+This brief is kept as the record of what was asked for; it no longer describes the app. The
+window-count dots it asks for became the stack edges, and the window list on ⌘⇥ was removed on
+2026-10-01 (`docs/spec.md` § Out of scope). ⌘⇥ is native, with stack edges behind the icons, and
+⌘§ is the window switcher (`docs/design-brief-v6.md`).
+
 ---
 
 Make **Window Switcher v5** as a new file, starting from `Window Switcher v4.dc.html`. Keep v4's

@@ -24,9 +24,9 @@ this way works from the first version that has the menu item; install that one b
 
 ## Use
 
-To switch between the windows of the app you're in, hold ⌘ and press §, the key above Tab on an
-ISO keyboard. It works like ⌘⇥, but for that app's windows: each tile shows where its window sits
-on its display.
+To switch between the windows of the app you're in, hold ⌘ and press the key above Tab: § on an
+ISO keyboard, \` on an ANSI one. It works like ⌘⇥, but for that app's windows: each tile shows
+where its window sits on its display.
 
 | Key, with ⌘ held | What happens |
 |---|---|

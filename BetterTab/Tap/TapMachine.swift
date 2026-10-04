@@ -19,6 +19,8 @@ nonisolated enum TapKey {
     static let upArrow: Int64 = 126
     /// `kVK_ISO_Section`: the § key, above Tab on ISO keyboards. ANSI keyboards have no such key.
     static let section: Int64 = 10
+    /// `kVK_ANSI_Grave`: the ` key, above Tab on ANSI keyboards and left of Z on ISO ones.
+    static let grave: Int64 = 50
 
     static let arrows: Set<Int64> = [leftArrow, rightArrow, downArrow, upArrow]
 }
@@ -48,6 +50,8 @@ nonisolated enum TapInputKind: Sendable {
 nonisolated struct TapInput: Sendable {
     let kind: TapInputKind
     let keycode: Int64
+    /// The key above Tab on the keyboard it came from (`KeyAboveTab`), written § below.
+    let aboveTab: Bool
     let flags: CGEventFlags
     let autorepeat: Bool
 }
@@ -173,7 +177,7 @@ nonisolated final class TapMachine: Sendable {
                     s.enter(.cycling)
                     r.event = .cycleStarted
                     r.note = .cycleStarted
-                } else if e.keycode == TapKey.section, command, e.flags.intersection(blocked).isEmpty {
+                } else if e.aboveTab, command, e.flags.intersection(blocked).isEmpty {
                     // ⌘§ does nothing in macOS, so it's always ours. Main ends the session at once
                     // if the front app has fewer than two windows.
                     r.verdict = .swallow
@@ -240,7 +244,7 @@ nonisolated final class TapMachine: Sendable {
                     // The switcher keeps the keyboard until ⌘ goes up: no ⌘-shortcut reaches the app.
                     r.verdict = .swallow
                     s.swallowedKeys.insert(e.keycode)
-                    if e.keycode == TapKey.section {
+                    if e.aboveTab {
                         // Held down, § repeats and walks on, like Tab in ⌘⇥.
                         r.event = .windowStep(e.flags.contains(.maskShift) ? -1 : 1)
                     } else if !e.autorepeat || TapKey.arrows.contains(e.keycode) {

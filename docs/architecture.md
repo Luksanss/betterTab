@@ -68,7 +68,10 @@ native is held open:
                                    WindowSwitcher panel (after 160 ms) ─► pick ─► Focuser
 ```
 
-- **The tap** swallows the ⌘§ keyDown (key code 10, `kVK_ISO_Section`) and enters Windows. There it
+- **The tap** swallows the ⌘§ keyDown and enters Windows. § is key code 10 (`kVK_ISO_Section`),
+  or 50 (`kVK_ANSI_Grave`) from an ANSI keyboard: `KeyAboveTab` judges each event by its
+  `keyboardEventKeyboardType`, against a table that `KBGetLayoutType` fills on main at launch,
+  since that call isn't thread-safe. There it
   swallows every keyDown while ⌘ is held, forwarding § as a step and the rest as keys, and passes
   the ⌘ release, which commits. Nothing is ever owed to the Dock, so no exit posts anything. ⌘⇥
   passes and moves to Cycling. A keyDown with ⌘ up means the release got past the tap, and it
@@ -90,7 +93,9 @@ native is held open:
   as they do.
 - **Focusing:** `Focuser.focus`. The target app is already in front, so a window on another Space
   depends on the make-key record and the raise switching Space: `activate`, the fallback, does
-  nothing for an app that's frontmost.
+  nothing for an app that's frontmost. They do switch it: SkyLight reports the new Space when the
+  slide ends, 370–410 ms after the raise, so the fallback waits up to a second before it decides
+  the switch is stuck (measured 2026-10-04).
 - **The panel** is an `OverlayPanel` that takes the mouse, since there's no native switcher for a
   click to close.
 

@@ -58,8 +58,8 @@ appeared only for apps with more than one window, and the stack edges said befor
 would ask.
 
 **⌘§ for the app you're in (added 2026-09-30).** In daily use the maintainer found that the app
-you're already in is the one ⌘⇥ makes hardest to reach: another Chrome window meant cycling
-through every other app and back. ⌘§, the key above Tab on an ISO keyboard, is ⌘⇥ for the front
+you're already in is the one ⌘⇥ makes hardest to reach: another Chrome window meant cycling through
+every other app and back. ⌘§, with the key above Tab (\` on an ANSI keyboard), is ⌘⇥ for the front
 app's windows: hold ⌘, § steps, releasing opens, and a quick tap flips to the previous window. It
 fixes what ⌘` lacks: you see where you're going, and it reaches full-screen windows and other
 Spaces. Each tile draws the window's outline on its display, because pictures would need Screen
