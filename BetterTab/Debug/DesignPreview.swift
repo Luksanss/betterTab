@@ -78,7 +78,7 @@ final class DesignPreview {
 private struct PreviewApp {
     let name: String
     let bundleID: String
-    /// Windows on every Space, as the stack edges count them.
+    /// Windows on every Space, the number the stack edges show.
     let windows: Int
 
     var icon: NSImage {
@@ -88,7 +88,7 @@ private struct PreviewApp {
         return NSWorkspace.shared.icon(forFile: url.path(percentEncoded: false))
     }
 
-    /// No edges, two, one, one, two (for eleven windows), then none.
+    /// No count, then 3, 2, 2 and 11, then none.
     static let standard: [PreviewApp] = [
         PreviewApp(name: "Slack", bundleID: "com.tinyspeck.slackmacgap", windows: 1),
         PreviewApp(name: "Google Chrome", bundleID: "com.google.Chrome", windows: 3),

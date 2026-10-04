@@ -2,20 +2,21 @@
 
 This file is the source of truth for what BetterTab does. `docs/product.md` explains why and
 `docs/architecture.md` explains how. When they disagree with this file about behaviour, this
-file wins. Written 2026-09-29; the stack edges come from the Claude design v5
-(`docs/design-brief-v5.md`) and ⌘§ from v6 (`docs/design-brief-v6.md`). Changed 2026-09-30: stack
-edges replaced the window-count dots, the first launch shows the Accessibility prompt, the menu
-shows the version, every push to `main` publishes a release, and ⌘§ was added. Changed
-2026-10-01: ⌘⇥ is native again. The window list it opened on release is gone (§ Out of scope).
-Changed 2026-10-04: releases are disk images, and updating came into scope: Check for Updates…
-in the menu, the only time BetterTab goes online (§ Updates), built on Sparkle. Later that day,
-ANSI keyboards got ⌘\`, their key above Tab (§ ⌘§: the front app's windows).
+file wins. Written 2026-09-29 from the Claude design v5 (`docs/design-brief-v5.md`); the stack
+edges now come from v8 (`docs/design-brief-v8.md`) and ⌘§ from v6 (`docs/design-brief-v6.md`).
+Changed 2026-09-30: stack edges replaced the window-count dots, the first launch shows the
+Accessibility prompt, the menu shows the version, every push to `main` publishes a release, and
+⌘§ was added. Changed 2026-10-01: ⌘⇥ is native again. The window list it opened on release is
+gone (§ Out of scope). Changed 2026-10-04: releases are disk images, and updating came into scope:
+Check for Updates… in the menu, the only time BetterTab goes online (§ Updates), built on Sparkle.
+Later that day, ANSI keyboards got ⌘\`, their key above Tab (§ ⌘§: the front app's windows), and
+the stack edges became a window count on the icon (§ ⌘⇥: stack edges).
 
 ## In one sentence
 
 ⌘§ is ⌘⇥ for the windows of the app you're in: hold ⌘, press § to step through them, and let go
-to open one. And while you ⌘⇥, apps with more than one window show the edges of more windows
-behind their icon.
+to open one. And while you ⌘⇥, apps with more than one window show their window count on their
+icon.
 
 ## Principles
 
@@ -36,19 +37,27 @@ These decide every case this spec doesn't cover.
 ## ⌘⇥: stack edges
 
 Hold ⌘ and press Tab: the macOS switcher, as always. Apps with two or more windows show **stack
-edges**: the top edges of more windows peeking out behind their icon, one edge for two windows
-and two for three or more. Releasing ⌘ switches natively, as it always has. If the app's most
-recent window isn't the one you want, ⌘§ gets you to the right one. (Dots under the icon were
-tried first, but they read as the Dock's "running" dots and sat on the app name.)
+edges**: the number of their windows, in a small capsule on the icon's bottom-left corner, where
+Finder puts its alias arrow. The number is exact, from 2 with no ceiling, so it also says what ⌘§
+will be there: a flip at 2, a look at the switcher at 5. Releasing ⌘ switches natively, as it
+always has. If the app's most recent window isn't the one you want, ⌘§ gets you to the right one.
+(Dots under the icon were tried first, but they read as the Dock's "running" dots and sat on the
+app name. Then, until 2026-10-04, the top edges of one or two more windows peeked out above the
+icon, which gave the stack edges their name; on macOS 27's nearly clear glass they were thin grey
+smudges. The count is direction C, "Count", of the Claude design v8.)
 
 - **Which windows count:** standard windows on every Space, including full-screen windows,
   minimized windows and the windows of hidden apps. Dialogs, palettes, sheets and background tabs
   don't count; an app's tabs are one window, as ⌘\` treats them. ⌘§ counts the same way.
   (Changed 2026-09-29: the first live run showed that counting only the current Space finds
   nothing for someone who keeps windows full-screen.)
-- The edges stay inside the Dock's highlight, follow light and dark appearance, and appear on
-  whichever display the switcher is on.
-- A quick ⌘⇥ tap may close the switcher before the edges are drawn. Nothing else depends on them.
+- The count sits on top of the icon, inside the Dock's highlight, and grows rightward as it gains
+  digits. It keeps clear of the top right, where macOS draws notification badges (an app with one,
+  such as Discord, shows both), and of the app's name below.
+- It's a white capsule with a near-black number in light appearance, and dark grey with a
+  near-white number in dark. It scales with the icon, doesn't animate, and appears on whichever
+  display the switcher is on. The exact geometry is in `docs/architecture.md`.
+- A quick ⌘⇥ tap may close the switcher before the counts are drawn. Nothing else depends on them.
 
 ## ⌘§: the front app's windows
 
@@ -214,7 +223,7 @@ open, and are never logged. Release builds log counts and states only.
 
 | What | Target |
 |---|---|
-| Stack edges drawn after the switcher appears | under 100 ms. The window counts come from SkyLight, about 1 ms per app; AX only drops windows that aren't standard ones, with a 250 ms timeout, so a hung app still gets its edges |
+| Stack edges drawn after the switcher appears | under 100 ms. The window counts come from SkyLight, about 1 ms per app; AX only drops windows that aren't standard ones, with a 250 ms timeout, so a hung app still gets its count |
 | ⌘§ switcher visible | 160 ms after ⌘§ while ⌘ is held, at once when the highlight moves; a quicker release flips without it |
 | The chosen window in front after ⌘§ | under 100 ms on the current Space; another Space adds macOS's slide |
 | Idle CPU | 0% |
@@ -230,7 +239,7 @@ These are hard-coded, with no settings UI.
 | Window switcher key | § (`kVK_ISO_Section`) on ISO keyboards, \` (`kVK_ANSI_Grave`) on ANSI ones, by the keyboard each press came from |
 | Window switcher shows after | 160 ms |
 | Maximum tiles | 9 |
-| Stack edges per icon | at most 2 |
+| Stack edges shown from | 2 windows; the count has no ceiling |
 | AX messaging timeout | 250 ms |
 | Permission re-check while missing | every 2 s |
 
@@ -259,11 +268,13 @@ Run these by hand on macOS 27. "Chrome ×3" means three Chrome windows on the cu
 
 1. **Native ⌘⇥.** ⌘⇥ to Chrome ×3 and release: a native switch to Chrome's most recent window,
    with nothing else on screen. The same for Notes (one window).
-2. **Stack edges.** While cycling, Chrome ×3 shows two edges behind its icon, Terminal ×2 shows
-   one, and Notes shows none. The edges stay inside the switcher's highlight.
+2. **Stack edges.** While cycling, Chrome ×3 shows 3 on its icon's bottom-left corner, Terminal ×2
+   shows 2, and Notes shows nothing. With 11 Finder windows, Finder shows 11 in a wider capsule.
+   Each count stays inside the switcher's highlight, and reads clearly in light and dark.
 3. **Stack edges, other Spaces.** With one Chrome window on Desktop 1 and two full-screen, Chrome
-   shows two stack edges.
-4. **Stack edges, second display.** With the switcher on the other display, the edges appear there.
+   shows 3.
+4. **Stack edges, second display.** With the switcher on the other display, the counts appear
+   there.
 5. **⌘§ flip.** In Chrome ×2, tap ⌘§ quickly: the other Chrome window is in front and key, and no
    switcher appeared. Tap it again: back to the first.
 6. **⌘§ cycle.** In Terminal ×3, hold ⌘ and press § twice: three tiles, the third highlighted.

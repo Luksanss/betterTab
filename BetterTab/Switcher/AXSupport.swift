@@ -77,12 +77,16 @@ nonisolated enum AXCall {
         return AXError(rawValue: code) ?? .failure
     }
 
-    /// AX's own top-left global coordinates.
+    /// AX's own top-left global coordinates, in one round trip.
     static func frame(_ element: AXUIElement) -> CGRect? {
-        guard let position = value(element, kAXPositionAttribute).value,
-            CFGetTypeID(position) == AXValueGetTypeID(),
-            let size = value(element, kAXSizeAttribute).value,
-            CFGetTypeID(size) == AXValueGetTypeID()
+        let values = values(element, [kAXPositionAttribute, kAXSizeAttribute]).values
+        return frame(position: values[0], size: values[1])
+    }
+
+    /// From a position and a size already read.
+    static func frame(position: CFTypeRef?, size: CFTypeRef?) -> CGRect? {
+        guard let position, CFGetTypeID(position) == AXValueGetTypeID(),
+            let size, CFGetTypeID(size) == AXValueGetTypeID()
         else { return nil }
         var point = CGPoint.zero
         var extent = CGSize.zero
@@ -92,9 +96,8 @@ nonisolated enum AXCall {
         return CGRect(origin: point, size: extent)
     }
 
-    /// Some elements vend a CFURL, others a path or URL string.
-    static func fileURL(_ element: AXUIElement, _ attribute: String) -> URL? {
-        let value = value(element, attribute).value
+    /// From a URL attribute already read: some elements vend a CFURL, others a path or URL string.
+    static func fileURL(_ value: CFTypeRef?) -> URL? {
         if let url = value as? URL { return url }
         guard let string = value as? String, !string.isEmpty else { return nil }
         if let url = URL(string: string), url.isFileURL { return url }

@@ -37,8 +37,8 @@ where its window sits on its display.
 
 A quick ⌘§ tap flips to the window you were in before.
 
-⌘⇥ stays exactly as macOS has it. While you cycle, apps with more than one window show the edges
-of more windows stacked behind their icon, so you know when ⌘§ will have somewhere to go.
+⌘⇥ stays exactly as macOS has it. While you cycle, apps with more than one window show how many
+they have in the corner of their icon, so you know when ⌘§ will have somewhere to go.
 
 The menu-bar item shows whether BetterTab is active and which version it is, and has Launch at
 Login, Check for Updates… and Quit. There are no settings.

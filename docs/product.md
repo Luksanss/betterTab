@@ -4,7 +4,7 @@ Working name, taken from the repo. A macOS menu-bar utility that gets you to the
 ⌘§ switches between the front app's windows the way ⌘⇥ switches between apps, and the native ⌘⇥
 switcher shows which apps have more than one window. Written 2026-09-29, before the build, and
 revised on 2026-10-01, when the window list on ⌘⇥ was dropped, and on 2026-10-04, when updating
-came into scope.
+came into scope and the stack edges became a window count.
 
 ## The problem
 
@@ -71,6 +71,13 @@ and when it lands on the wrong window, ⌘§ fixes it in a tap; the maintainer s
 well" for exactly that. So the list went, and ⌘⇥ is native. The stack edges stayed: they still
 show which apps have more than one window, which is when ⌘§ has somewhere to go. Exact behaviour
 is in `docs/spec.md`.
+
+**Then, a window count (2026-10-04).** On macOS 27's nearly clear glass the thin grey edges were
+"kinda ugly and not really noticable", in the maintainer's words. Of three Claude Design
+directions, cards slid out to the icon's left were built first and dropped on renders with real
+icons. The stack edges are now the window count in a capsule on the icon's bottom-left corner. It
+still shows which apps ⌘§ has something to do for, and the exact number says what that will be: a
+flip at 2, a look at the switcher at 5.
 
 ## Updates (added 2026-10-04)
 

@@ -115,7 +115,7 @@ extension SelfTest {
         if let last {
             let expected = last.items.compactMap(\.pid).filter { (windowsByPid[$0]?.count ?? 0) >= 2 }.count
             let unmatched = last.items.filter { $0.pid == nil }.count
-            run.note("\(last.items.count) icons, \(expected) with stack edges expected, \(unmatched) not matched to an app")
+            run.note("\(last.items.count) icons, \(expected) with a count expected, \(unmatched) not matched to an app")
             if expected > 0 { run.check(stackEdges?.isVisible == true, "the stack edges panel isn't visible") }
             // AX points, top-left origin, so they line up with a screenshot of the main display.
             let frames = last.items.compactMap(\.frame).map(Self.describe).joined(separator: ", ")
@@ -138,26 +138,29 @@ extension SelfTest {
         for item in switcher.items {
             guard let pid = item.pid, let bundle = bundleByPid[pid], let axFrame = item.frame else { continue }
             let frame = appKitRect(axFrame)
-            let expected = SelfTestPlan.expectedStackEdges(
-                windows: windowsByPid[pid]?.count ?? 0, maxEdges: StackEdgesOverlay.maxEdges)
+            let expected = SelfTestPlan.expectedStackEdgeCount(windows: windowsByPid[pid]?.count ?? 0)
             let icon = state?.icons
                 .filter { hypot($0.frame.midX - frame.midX, $0.frame.midY - frame.midY) <= 8 }
                 .min { hypot($0.frame.midX - frame.midX, $0.frame.midY - frame.midY)
                     < hypot($1.frame.midX - frame.midX, $1.frame.midY - frame.midY) }
-            let shown = visible ? icon?.edgeCount ?? 0 : 0
+            let shown = visible ? icon?.count : nil
             if shown != expected {
-                problems.append("\(bundle) shows \(shown) stack edges, expected \(expected)")
-            } else if shown > 0, let front = icon?.frontEdge, let top = icon?.top {
-                // Centred on the icon, above its body, and inside the Dock's highlight: the frame
-                // inset by 4 pt at 128 pt, scaled for smaller icons. The body comes from the AX
-                // frame read here, not from the overlay.
-                let dx = front.midX - frame.midX
-                let rise = top - (frame.midY + frame.height * StackEdgesOverlay.bodyScale / 2)
-                let headroom = frame.maxY - top
-                if abs(dx) > 2 || rise <= 0 || headroom < frame.height * 4 / 128 {
+                problems.append("\(bundle) shows \(shown.map(String.init) ?? "no count"), expected \(expected.map(String.init) ?? "none")")
+            } else if shown != nil, let capsule = icon?.capsule {
+                // On the body's bottom-left corner, and inside the Dock's highlight: the frame inset
+                // by 4 pt at 128 pt, scaled for smaller icons. The body comes from the AX frame read
+                // here, not from the overlay.
+                let side = frame.height * StackEdgesOverlay.bodyScale
+                let dx = capsule.minX - (frame.midX - side / 2)
+                let dy = capsule.minY - (frame.midY - side / 2)
+                let inset = frame.height * 4 / 128
+                let inside = frame.insetBy(dx: inset, dy: inset).contains(capsule)
+                let slack = side * 0.03
+                let overhang = side * StackEdgesOverlay.overhang
+                if abs(dx + overhang) > slack || abs(dy + overhang) > slack || !inside {
                     problems.append("""
-                        \(bundle)'s stack edges are off their icon (dx \(Int(dx)), \(Int(rise)) pt above the body, \
-                        \(Int(headroom)) pt below the icon frame's top)
+                        \(bundle)'s count is off its icon's corner (dx \(Int(dx)), dy \(Int(dy)) from the body's \
+                        bottom left, \(inside ? "inside" : "outside") the highlight)
                         """)
                 }
             }

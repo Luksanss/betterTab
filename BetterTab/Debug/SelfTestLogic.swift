@@ -112,10 +112,10 @@ nonisolated enum SelfTestPlan {
     static let minimizedTag: UInt64 = 1 << 60
     static let fullScreenTag: UInt64 = 1 << 42
 
-    /// The stack edges an icon should get: none below two windows, then one for each window after
-    /// the first, at most `maxEdges`.
-    static func expectedStackEdges(windows: Int, maxEdges: Int = 2) -> Int {
-        windows >= 2 ? min(windows - 1, maxEdges) : 0
+    /// The number an icon's stack edges should show: its window count, with no ceiling, and none
+    /// below two windows.
+    static func expectedStackEdgeCount(windows: Int) -> Int? {
+        windows >= 2 ? windows : nil
     }
 }
 

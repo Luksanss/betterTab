@@ -5,8 +5,8 @@ Given to Claude Design on 2026-09-29. Project: "Mac Window Switcher Prototype". 
 
 This brief is kept as the record of what was asked for; it no longer describes the app. The
 window-count dots it asks for became the stack edges, and the window list on ⌘⇥ was removed on
-2026-10-01 (`docs/spec.md` § Out of scope). ⌘⇥ is native, with stack edges behind the icons, and
-⌘§ is the window switcher (`docs/design-brief-v6.md`).
+2026-10-01 (`docs/spec.md` § Out of scope). ⌘⇥ is native, with a window count on the icons
+(`docs/design-brief-v8.md`), and ⌘§ is the window switcher (`docs/design-brief-v6.md`).
 
 ---
 

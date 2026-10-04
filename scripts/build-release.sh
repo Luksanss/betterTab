@@ -6,6 +6,7 @@
 #
 # The arguments can also come from VERSION, BUILD_NUMBER and SIGNING_IDENTITY.
 # With an identity, the app is signed with it for team 5KDU5HYH35. Without one, it's ad-hoc.
+# Either way Xcode signs it, then this script signs the app again without get-task-allow (below).
 # dmgbuild lays out the image's window; it's installed by hash into build/dmgbuild, with
 # Python 3.10 or later.
 set -euo pipefail
@@ -46,7 +47,57 @@ if grep -F ': warning: ' "$log" | grep -F "$root/"; then
   exit 1
 fi
 
+# Xcode adds com.apple.security.get-task-allow to every build it signs with a development identity
+# or ad hoc, Release included. It would let any process of the user's attach a debugger to BetterTab
+# and act with its Accessibility grant, so the app is signed again with the same identity, the
+# entitlements Xcode derived for it minus that one, and the hardened runtime.
+# CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO would drop the other derived entitlements too.
+#
+# Inside out, but only the app needs it. The code nested in it is Sparkle's: the framework, which
+# Xcode signed with the same identity, and the helpers inside it, which keep Sparkle's own
+# signatures, as in every release so far. None of it has get-task-allow, which the check below
+# makes sure of. Never --deep, which would sign Sparkle's helpers again with the app's entitlements.
+# --timestamp=none, like Xcode's own signing with a development certificate: no trip to Apple.
+entitlements=$out/BetterTab.entitlements
+codesign -d --entitlements "$entitlements" --xml "$app" 2> /dev/null
+options=(--force --sign "${identity:--}" --options runtime --timestamp=none)
+if [[ -s $entitlements ]]; then
+  /usr/libexec/PlistBuddy -c 'Delete :com.apple.security.get-task-allow' "$entitlements" > /dev/null 2>&1 || true
+  [[ $(plutil -convert json -o - "$entitlements") == '{}' ]] || options+=(--entitlements "$entitlements")
+fi
+requirement=$(codesign -d -r- "$app" 2> /dev/null)
+codesign "${options[@]}" "$app"
+rm -f "$entitlements"
+
+# The Accessibility grant follows the designated requirement, so every user would lose it if this
+# changed it. An ad hoc one is the cdhash, which changes with any signature.
+if [[ -n $identity && $(codesign -d -r- "$app" 2> /dev/null) != "$requirement" ]]; then
+  echo "error: signing the app again changed its designated requirement" >&2
+  exit 1
+fi
+
 codesign --verify --deep --strict "$app"
+
+# What each piece of code in the app is signed with, and none may keep get-task-allow. Not the
+# certificate's name: it holds an email address, and the workflow's logs are public.
+while IFS= read -r -d '' code; do
+  [[ $(file -b --mime-type "$code") == application/x-mach-binary* ]] || continue
+  details=$(codesign -dv "$code" 2>&1)
+  flags=$(sed -nE 's/^CodeDirectory .*flags=0x[0-9a-f]+\(([^)]*)\).*/\1/p' <<< "$details")
+  echo "${code#"$app/"}"
+  echo "  $(grep -E '^Identifier=' <<< "$details"), $(grep -E '^TeamIdentifier=' <<< "$details"), flags: $flags"
+  granted=$(codesign -d --entitlements - --xml "$code" 2> /dev/null || true)
+  if grep -qF '<key>com.apple.security.get-task-allow</key>' <<< "$granted"; then
+    echo "error: ${code#"$app/"} still has get-task-allow" >&2
+    exit 1
+  fi
+  if [[ $(plutil -convert json -o - - <<< "$granted" 2> /dev/null || echo '{}') == '{}' ]]; then
+    echo "  entitlements: none"
+  else
+    echo "  entitlements:"
+    plutil -p - <<< "$granted" | sed 's/^/    /'
+  fi
+done < <(find "$app" -type f -print0 | sort -z)
 
 # The venv outlives the clean above, and is rebuilt when the pinned requirements change.
 if ! cmp -s "$requirements" "$venv/requirements.txt"; then
