@@ -20,6 +20,10 @@ Spaces stays, and there's no LICENSE (Decisions). The handoffs of that day tell 
 `docs/archive/handoffs/2026-10-04-grant.md` (release 8's first update through the menu) and
 `docs/archive/handoffs/2026-10-04-ansi.md` (the self-test runs, the Space timing and the decisions).
 
+The maintainer then updated to v1.0.88 through Check for Updates… at 13:40 and reported the checks
+done: ⌘§ opens the switcher on this Mac's ISO keyboard, and ⌘\` stays macOS's. Acceptance test 22
+counts as passed with the rest (Decisions), so the stack edges redesign is the only work left.
+
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because the
 maintainer says a version works. At that point it's copied to `docs/archive/handoffs/<ISO date>.md`
@@ -37,13 +41,11 @@ ticket tracker; the next action below is the backlog.
 
 - **`main`** is release 9, v1.0.88 (`09d2892`, the merge of pull request 9), published on
   2026-10-04. The local `main` was fast-forwarded to it.
-- **`dev`** is one commit ahead of `main`: this handoff. `origin/dev` is at `e5dd507`; this commit
-  isn't pushed.
-- **The installed app is v1.0.81** in `/Applications`, certificate-signed (team `5KDU5HYH35`),
-  updated from v1.0.77 through Check for Updates… at 12:50, with Accessibility granted, until the
-  maintainer updates to v1.0.88 (Next action 1).
-- **Three scratch TextEdit documents** from the self-test may still be open; they're unmodified
-  files in the session scratchpad, so close them without saving.
+- **`dev`** is two commits ahead of `main`: `3179eef` (the release 9 archive) and this handoff.
+  `origin/dev` is at `e5dd507`; neither is pushed. Neither changes the app, so they can wait for
+  the next release.
+- **The installed app is v1.0.88** in `/Applications`, certificate-signed (team `5KDU5HYH35`),
+  updated from v1.0.81 through Check for Updates… at 13:40, with Accessibility granted.
 - **A local test image:** `build/release/BetterTab-1.0.99.dmg`, ad hoc, from
   `scripts/build-release.sh 1.0.99 99`, with Sparkle in it; the version is a test number. Beside
   it, an `appcast.xml` and `notes.md` from `scripts/make-appcast.sh`, signed with a throwaway key:
@@ -70,14 +72,7 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Update to v1.0.88** through Check for Updates… in v1.0.81. Then:
-   - ⌘§ still opens the switcher on this Mac's ISO keyboard, and ⌘\` (left of Z) still does
-     macOS's "Move focus to next window";
-   - a ⌘§ pick to another Space still slides there, and `log stream --info --predicate
-     'subsystem == "com.luksanss.BetterTab"'` says "space switched", with no "fell back".
-2. **Acceptance test 22 needs an ANSI keyboard,** which this Mac doesn't have. Until someone with
-   one tries it, ⌘\` on ANSI rests on the code and on `KBGetLayoutType`'s table (Findings).
-3. **Redesign the stack edges, when the maintainer is ready** ("we will discuss that later"). First
+1. **Redesign the stack edges, when the maintainer is ready** ("we will discuss that later"). First
    ask what looks funky: the edges themselves (their opacity, `rise`, `narrowing`, in Decisions),
    their place inside the highlight, or how they sit on some icons. Then compare variants
    offscreen, as on 2026-09-30 (Findings, the stack edges session), or write a brief for Claude
@@ -86,8 +81,9 @@ ticket tracker; the next action below is the backlog.
 ## Decisions already settled
 
 - **The acceptance tests count as passed** (maintainer, 2026-10-04: "Consider the tests as
-  passed"), for tests 1–21. The agent ran or measured 1, 2, 5, 6, 8 (Esc), 15 and 18, and the
-  maintainer ran the update in 20; the rest have no recorded run.
+  passed"), for tests 1–21, and 22 after release 9 ("consider done"). The agent ran or measured
+  1, 2, 5, 6, 8 (Esc), 15 and 18, and the maintainer ran the update in 20; the rest have no
+  recorded run.
 - **ANSI keyboards get ⌘\`, only from an ANSI keyboard** (maintainer, 2026-10-04: "If the support
   for the other keyboards is just adding a few more symbols that are supported, I suppose we
   should", and "the pair of command and key for that keyboard should be only local to that
@@ -490,12 +486,10 @@ Public APIs can't reliably focus one window. The API table is in `docs/architect
 
 ## Known gaps
 
-- **v1.0.88 isn't installed yet,** so the `Focuser` fix and ⌘\` on ANSI keyboards have only run in
-  Debug builds (Next action 1).
-- **⌘\` hasn't been pressed on a real ANSI keyboard** (Next action 2).
 - **Accepted as passed without a recorded run** (Decisions): "You're up to date!", a check with
   Wi-Fi off, and a day of test 21; the first-launch prompt on a release (test 17); whether another
-  window flashes before the picked one (test 11); ⌘§'s `.hudWindow` material in light mode.
+  window flashes before the picked one (test 11); ⌘§'s `.hudWindow` material in light mode; ⌘\` on
+  a real ANSI keyboard (test 22).
 - **`windows-cycle` hasn't run across Spaces:** Chrome had two windows.
 - **Unverified on macOS 27:** whether a lone make-key mouse down leaves an app thinking the button
   is held, and tag bit 60 for minimized windows.
