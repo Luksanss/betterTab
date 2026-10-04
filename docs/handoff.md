@@ -80,9 +80,9 @@ ticket tracker; the next action below is the backlog.
    § Updates). Built on Sparkle 2.10.0 on 2026-10-04: the menu item, `BetterTab/Info.plist`,
    `scripts/make-appcast.sh` and the workflow steps. Left:
    - **Sparkle's key.** The maintainer generated it on 2026-10-04; its public half is in
-     `SUPublicEDKey` and matches the login keychain (`generate_keys -p`). Still missing:
-     `SPARKLE_ED_PRIVATE_KEY` in the `release` environment (`docs/releasing.md` § Updates). Until
-     it's set, a release fails at "Sign the update and write the appcast", safely.
+     `SUPublicEDKey` and matches the login keychain (`generate_keys -p`), and
+     `SPARKLE_ED_PRIVATE_KEY` is in the `release` environment beside the certificate's two secrets
+     (`docs/releasing.md` § Updates). The exported key file was deleted.
    - **Release it.** The first release with Sparkle is installed by hand and asks for Accessibility
      once, being the first certificate-signed one. Its run summary should say "Signed with the
      Apple Development certificate", and the release should carry `appcast.xml`.
