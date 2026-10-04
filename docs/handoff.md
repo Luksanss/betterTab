@@ -10,11 +10,11 @@ installed v1.0.77, installed v1.0.81 and relaunched, then reported "1. and 2. do
 well" for that handoff's Next actions 1 and 2: Accessibility granted on v1.0.77, the disk image's
 real Finder window checked, and v1.0.81 back as "Active" with no permission prompt and no Open
 Anyway, and Launch at Login unchanged. So the certificate signing does what it was for: an update
-keeps the grant. The rest of acceptance test 20, and test 21, are still to do (Next action 1).
+keeps the grant.
 
 Then the maintainer gave the agent the Mac for a few minutes ("the rest of the stuff which you can
 do alone, do it"), and said of the stack edges: "keep the stack edges, but the stack edges look a
-bit funky right now, so they will need to be redesigned" (Next action 2). In that time the agent:
+bit funky right now, so they will need to be redesigned" (Next action 3). In that time the agent:
 - **ran the self-test,** six times, all passing (Findings);
 - **found what the Space switch does:** the make-key record and the raise switch Space by
   themselves, and the 300 ms wait gave up before the slide ended, so every cross-Space pick logged
@@ -24,8 +24,13 @@ bit funky right now, so they will need to be redesigned" (Next action 2). In tha
 - **marked `docs/design-brief-v5.md` as historical,** which finishes the docs for "only ⌘§";
 - **removed the leftover release 4 worktree** and its branch, after `lsregister -u` on its builds.
 
-**Release 9** is `dev` now: the `Focuser` fix, the brief and the handoffs. If nothing else lands
-first, it's **v1.0.86**: the 81 commits on `main`, the four on `dev`, and the merge.
+Last, the maintainer settled everything left but the stack edges (Decisions): "Consider the tests
+as passed"; ANSI keyboards get ⌘\`, but only from an ANSI keyboard (`bb81225`); ⌘§'s order across
+Spaces stays; and there's no LICENSE. The stack edges are for later: "we will discuss that later".
+
+**Release 9** is `dev` now: the `Focuser` fix, ⌘\` on ANSI keyboards, the brief and the handoffs.
+If nothing else lands first, it's **v1.0.88**: the 81 commits on `main`, the six on `dev`, and the
+merge.
 
 **Convention.** The current handoff lives at this path and is rewritten in place by every
 `/handoff-update`. It's archived only **at a release**, when `dev` is merged into `main` because
@@ -45,9 +50,9 @@ ticket tracker; the next action below is the backlog.
 
 - **`main`** is release 8, v1.0.81 (`5510bbb`, the merge of pull request 8), published on
   2026-10-04. The local `main` was fast-forwarded to it in this session.
-- **`dev`** is four commits ahead of `main`: `6530326` (the release 8 archive), `8999b85`
-  (`Focuser`), `7d27c4b` (the v5 brief) and this handoff. `origin/dev` is at `dcc9c00`; none of
-  the four is pushed.
+- **`dev`** is six commits ahead of `main`: `6530326` (the release 8 archive), `8999b85`
+  (`Focuser`), `7d27c4b` (the v5 brief), `d5a2e23` (a handoff), `bb81225` (ANSI keyboards) and
+  this handoff. `origin/dev` is at `dcc9c00`; none of the six is pushed.
 - **The installed app is v1.0.81** in `/Applications`, certificate-signed (team `5KDU5HYH35`),
   updated from v1.0.77 through Check for Updates… at 12:50, with Accessibility granted. The agent
   quit it for the self-test and relaunched it at 13:19.
@@ -79,32 +84,42 @@ ticket tracker; the next action below is the backlog.
 
 ## Next action
 
-1. **Finish acceptance tests 20 and 21** on the installed v1.0.81. Check for Updates… should say
-   "You're up to date!" (v1.0.77 couldn't show it: v1.0.81 was out before the maintainer
-   checked), and with Wi-Fi off it should say it couldn't check, and nothing changes. Test 21: over
-   a day of use without choosing Check for Updates…, a network monitor shows no connections from
-   BetterTab. A minute of it is done (Findings), and Info.plist has `SUEnableAutomaticChecks` off.
-2. **Redesign the stack edges** (maintainer, 2026-10-04, quoted above). First ask what looks funky:
-   the edges themselves (their opacity, `rise`, `narrowing`, in Decisions), their place inside
-   the highlight, or how they sit on some icons. Then compare variants offscreen, as on
-   2026-09-30 (Findings, the stack edges session), or write a brief for Claude Design like v6.
-3. **Release 9.** When the maintainer says `dev` works, they push it, open the pull request and
-   merge it. Then Check for Updates… in v1.0.81 should offer it with the note "Wait for the Space
-   slide before falling back to activate". A ⌘§ pick to another Space should still slide there,
-   and `log stream --info --predicate 'subsystem == "com.luksanss.BetterTab"'` should say "space
-   switched", with no "fell back".
-4. **The maintainer runs the rest of acceptance tests 1–19 by hand.** The self-test covers native
-   ⌘⇥ (1), the stack edges' frames (2), the ⌘§ flip (5), cycling (6), Esc (8) and ⌘ not stuck
-   (15), and 18 was measured, so what's left is 3, 4, 7, letters (8), 9–14, 16, 17 and 19. Most
-   important: 11 (whether another window flashes before a full-screen one; the slide itself
-   works), 16 (`kill -9` during ⌘§) and 17 (the first-launch prompt, seen only on a Debug build).
-5. **Still to discuss** (the maintainer said "we will discuss later" on 2026-09-30):
-   - ⌘§ on ANSI keyboards, which have no § key (their key above Tab is ⌘`'s);
-   - ⌘§'s order across Spaces (Findings).
-6. **Optional: add a LICENSE.** The public repo is all rights reserved without one.
+1. **Release 9.** When the maintainer says `dev` works, they push it, open the pull request and
+   merge it. Then Check for Updates… in v1.0.81 should offer it, with the notes "Wait for the Space
+   slide before falling back to activate" and "Open the window switcher with ⌘\` on ANSI
+   keyboards". After the update:
+   - ⌘§ still opens the switcher on this Mac's ISO keyboard, and ⌘\` (left of Z) still does
+     macOS's "Move focus to next window";
+   - a ⌘§ pick to another Space still slides there, and `log stream --info --predicate
+     'subsystem == "com.luksanss.BetterTab"'` says "space switched", with no "fell back".
+2. **Acceptance test 22 needs an ANSI keyboard,** which this Mac doesn't have. Until someone with
+   one tries it, ⌘\` on ANSI rests on the code and on `KBGetLayoutType`'s table (Findings).
+3. **Redesign the stack edges, when the maintainer is ready** ("we will discuss that later"). First
+   ask what looks funky: the edges themselves (their opacity, `rise`, `narrowing`, in Decisions),
+   their place inside the highlight, or how they sit on some icons. Then compare variants
+   offscreen, as on 2026-09-30 (Findings, the stack edges session), or write a brief for Claude
+   Design like v6.
 
 ## Decisions already settled
 
+- **The acceptance tests count as passed** (maintainer, 2026-10-04: "Consider the tests as
+  passed"), for tests 1–21. The agent ran or measured 1, 2, 5, 6, 8 (Esc), 15 and 18, and the
+  maintainer ran the update in 20; the rest have no recorded run.
+- **ANSI keyboards get ⌘\`, only from an ANSI keyboard** (maintainer, 2026-10-04: "If the support
+  for the other keyboards is just adding a few more symbols that are supported, I suppose we
+  should", and "the pair of command and key for that keyboard should be only local to that
+  keyboard"). So the key above Tab works on each keyboard, and the other keyboard's key doesn't.
+  - `KeyAboveTab` judges each key event by the keyboard it came from
+    (`keyboardEventKeyboardType`), so with an ISO and an ANSI keyboard both plugged in, ` on the
+    ISO one still passes to macOS.
+  - On an ANSI keyboard, BetterTab takes ⌘\` from macOS's "Move focus to next window" while it
+    runs (agent's note; it does the same job, with the switcher). Nothing is turned off: quit
+    BetterTab and ⌘\` is macOS's again.
+  - JIS keyboards, and types macOS reports no layout for, only get §.
+- **⌘§'s order across Spaces stays** (maintainer, 2026-10-04: "order across spaces it's okay keep
+  it"): the current Space's windows first, as SkyLight gives them (Findings).
+- **No LICENSE** (maintainer, 2026-10-04: "keep it as it is the default license like you say is
+  all rights reserved").
 - **The stack edges stay, and get a redesign** (maintainer, 2026-10-04: "No, keep the stack edges,
   but the stack edges look a bit funky right now, so they will need to be redesigned"), when asked
   whether "only ⌘§" meant they go too. So "only ⌘§" was about the docs, which are done.
@@ -244,6 +259,15 @@ ticket tracker; the next action below is the backlog.
 - **No ticket tracker.**
 
 ## Findings worth keeping
+
+**From ANSI support (2026-10-04, after release 8):**
+- **`KBGetLayoutType` is "Not thread safe"** (`HIToolbox/Keyboards.h`), so the key tap can't call
+  it. Over keyboard types 0–255 it returns 69 ANSI, 67 ISO, 66 JIS and 54 `'????'`, 0 among them,
+  so an unknown keyboard never takes ⌘\`. `KeyAboveTab` builds its table on main when `KeyTap`
+  is made.
+- **This Mac's built-in keyboard is type 92, ISO** (`LMGetKbdType`). Events from
+  `CGEventSource(stateID: .hidSystemState)` carry the same type, so the self-test's synthetic §
+  still counts.
 
 **From the self-test and the Space switch (2026-10-04, after release 8):**
 - **Six self-test runs, all passing.** At 13:16, with TextEdit ×3 as home, Claude as the
@@ -479,17 +503,14 @@ Public APIs can't reliably focus one window. The API table is in `docs/architect
 
 ## Known gaps
 
-- **"You're up to date!", a check with Wi-Fi off, and a day of test 21 are unseen** (Next
-  action 1).
-- **The `Focuser` fix is only in Debug builds so far** (Next action 3).
+- **The `Focuser` fix and ⌘\` on ANSI keyboards are only in Debug builds so far** (Next action 1).
+- **⌘\` hasn't been pressed on a real ANSI keyboard** (Next action 2).
+- **Accepted as passed without a recorded run** (Decisions): "You're up to date!", a check with
+  Wi-Fi off, and a day of test 21; the first-launch prompt on a release (test 17); whether another
+  window flashes before the picked one (test 11); ⌘§'s `.hudWindow` material in light mode.
 - **`windows-cycle` hasn't run across Spaces:** Chrome had two windows.
-- **Whether ⌘§'s `.hudWindow` material looks right in light mode is unseen.**
-- **The first-launch prompt is unconfirmed for a release** (acceptance test 17); it has been seen
-  on a Debug build.
-- **Unverified on macOS 27:**
-  - whether another window of the app flashes before the picked one (test 11);
-  - whether a lone make-key mouse down leaves an app thinking the button is held;
-  - tag bit 60 for minimized windows.
+- **Unverified on macOS 27:** whether a lone make-key mouse down leaves an app thinking the button
+  is held, and tag bit 60 for minimized windows.
 - **Nobody but the maintainer has installed it yet.**
 - **The build check is manual.** The only workflow is the release.
 
