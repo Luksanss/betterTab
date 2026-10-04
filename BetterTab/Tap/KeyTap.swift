@@ -42,9 +42,12 @@ nonisolated enum TapEndReason: String, Sendable {
 /// swallows ⌘, so macOS is never owed a ⌘ release. Sendable, so any thread can stop it.
 nonisolated final class KeyTap: Sendable {
     private let machine: TapMachine
+    private let aboveTab: KeyAboveTab
     private let current = Mutex<TapThread?>(nil)
 
-    init(deliver: @escaping @MainActor @Sendable (TapMessage) -> Void) {
+    /// Main actor, for `KeyAboveTab`.
+    @MainActor init(deliver: @escaping @MainActor @Sendable (TapMessage) -> Void) {
+        aboveTab = KeyAboveTab()
         machine = TapMachine { message in
             DispatchQueue.main.async { MainActor.assumeIsolated { deliver(message) } }
         }
@@ -54,7 +57,7 @@ nonisolated final class KeyTap: Sendable {
     func start() {
         let tap: TapThread? = current.withLock { current in
             guard current == nil else { return nil }
-            let tap = TapThread(machine: machine)
+            let tap = TapThread(machine: machine, aboveTab: aboveTab)
             current = tap
             return tap
         }
@@ -103,6 +106,7 @@ nonisolated private func keyTapCallback(
 /// or a busy main thread can never delay the callback.
 nonisolated private final class TapThread: Sendable {
     private let machine: TapMachine
+    private let aboveTab: KeyAboveTab
     private let port = Mutex<PortRef?>(nil)
     private let control = Mutex(LoopControl())
     private let finished = DispatchSemaphore(value: 0)
@@ -110,8 +114,9 @@ nonisolated private final class TapThread: Sendable {
     private static let mask: CGEventMask = [CGEventType.keyDown, .keyUp, .flagsChanged]
         .reduce(0) { $0 | (CGEventMask(1) << CGEventMask($1.rawValue)) }
 
-    init(machine: TapMachine) {
+    init(machine: TapMachine, aboveTab: KeyAboveTab) {
         self.machine = machine
+        self.aboveTab = aboveTab
     }
 
     func start() {
@@ -201,9 +206,13 @@ nonisolated private final class TapThread: Sendable {
         }
         guard let kind = TapInputKind(type) else { return Unmanaged.passUnretained(event) }
 
+        let keycode = event.getIntegerValueField(.keyboardEventKeycode)
+        let keyboardType = event.getIntegerValueField(.keyboardEventKeyboardType)
         let input = TapInput(
             kind: kind,
-            keycode: event.getIntegerValueField(.keyboardEventKeycode),
+            keycode: keycode,
+            aboveTab: kind != .flagsChanged
+                && aboveTab.matches(keycode: keycode, keyboardType: keyboardType),
             flags: event.flags,
             autorepeat: kind == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
 

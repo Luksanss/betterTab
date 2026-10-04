@@ -8,7 +8,8 @@ edges replaced the window-count dots, the first launch shows the Accessibility p
 shows the version, every push to `main` publishes a release, and ⌘§ was added. Changed
 2026-10-01: ⌘⇥ is native again. The window list it opened on release is gone (§ Out of scope).
 Changed 2026-10-04: releases are disk images, and updating came into scope: Check for Updates…
-in the menu, the only time BetterTab goes online (§ Updates), built on Sparkle.
+in the menu, the only time BetterTab goes online (§ Updates), built on Sparkle. Later that day,
+ANSI keyboards got ⌘\`, their key above Tab (§ ⌘§: the front app's windows).
 
 ## In one sentence
 
@@ -56,7 +57,8 @@ another meant cycling through every other app and back to Chrome. ⌘§ is ⌘�
 windows. Its look is direction 3, "window outlines", of the Claude design v6 (brief in
 `docs/design-brief-v6.md`).
 
-1. **Hold ⌘ and press §,** the key above Tab on an ISO keyboard. The window switcher opens in the
+1. **Hold ⌘ and press §,** the key above Tab on an ISO keyboard (\` on an ANSI one; § stands for
+   either below). The window switcher opens in the
    middle of the display showing the window you're in. The highlight starts on the **second**
    window, the one you were in before, the way ⌘⇥ starts on the previous app. ⌘⇧§ starts on the
    last window instead.
@@ -118,8 +120,11 @@ the highlight only once it has moved, so a pointer resting where the switcher op
 - **A window on another Space,** full-screen or not: opening it switches to its Space, with
   macOS's usual slide.
 - **A minimized window** is restored and focused.
-- **ANSI keyboards** have no § key. Their key above Tab is `, and ⌘` is macOS's own "Move focus to
-  next window", so ⌘§ isn't available on them for now.
+- **ANSI keyboards** have no § key. Their key above Tab is \`, so on them ⌘\` opens the window
+  switcher, in place of macOS's own "Move focus to next window" while BetterTab runs. Each key
+  press counts by the keyboard it came from: on an ISO keyboard \` sits left of Z, and ⌘\` stays
+  macOS's there, even with an ANSI keyboard plugged in too. JIS keyboards, and keyboards macOS
+  reports no layout for, only get §.
 
 ## States
 
@@ -222,7 +227,7 @@ These are hard-coded, with no settings UI.
 | Constant | Value |
 |---|---|
 | Letters | A S D F G H J K L (physical home-row keys) |
-| Window switcher key | § (`kVK_ISO_Section`, above Tab on ISO keyboards) |
+| Window switcher key | § (`kVK_ISO_Section`) on ISO keyboards, \` (`kVK_ANSI_Grave`) on ANSI ones, by the keyboard each press came from |
 | Window switcher shows after | 160 ms |
 | Maximum tiles | 9 |
 | Stack edges per icon | at most 2 |
@@ -294,3 +299,5 @@ Run these by hand on macOS 27. "Chrome ×3" means three Chrome windows on the cu
     couldn't check, and nothing changes.
 21. **Offline unless asked.** Over a day of use without choosing Check for Updates…, a network
     monitor shows no connections from BetterTab.
+22. **ANSI keyboard.** On an ANSI keyboard, ⌘\` does everything ⌘§ does on an ISO one. On an ISO
+    keyboard, ⌘\` stays macOS's "Move focus to next window", with an ANSI keyboard plugged in too.

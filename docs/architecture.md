@@ -68,7 +68,10 @@ native is held open:
                                    WindowSwitcher panel (after 160 ms) ─► pick ─► Focuser
 ```
 
-- **The tap** swallows the ⌘§ keyDown (key code 10, `kVK_ISO_Section`) and enters Windows. There it
+- **The tap** swallows the ⌘§ keyDown and enters Windows. § is key code 10 (`kVK_ISO_Section`),
+  or 50 (`kVK_ANSI_Grave`) from an ANSI keyboard: `KeyAboveTab` judges each event by its
+  `keyboardEventKeyboardType`, against a table that `KBGetLayoutType` fills on main at launch,
+  since that call isn't thread-safe. There it
   swallows every keyDown while ⌘ is held, forwarding § as a step and the rest as keys, and passes
   the ⌘ release, which commits. Nothing is ever owed to the Dock, so no exit posts anything. ⌘⇥
   passes and moves to Cycling. A keyDown with ⌘ up means the release got past the tap, and it
