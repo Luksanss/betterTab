@@ -90,7 +90,9 @@ native is held open:
   as they do.
 - **Focusing:** `Focuser.focus`. The target app is already in front, so a window on another Space
   depends on the make-key record and the raise switching Space: `activate`, the fallback, does
-  nothing for an app that's frontmost.
+  nothing for an app that's frontmost. They do switch it: SkyLight reports the new Space when the
+  slide ends, 370–410 ms after the raise, so the fallback waits up to a second before it decides
+  the switch is stuck (measured 2026-10-04).
 - **The panel** is an `OverlayPanel` that takes the mouse, since there's no native switcher for a
   click to close.
 

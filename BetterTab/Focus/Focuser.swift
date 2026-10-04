@@ -21,10 +21,18 @@ enum Focuser {
     private nonisolated static let axTimeout: Float = 0.25
     /// The longest a hidden app gets to show its windows again before we carry on regardless.
     private nonisolated static let unhideWait: UInt64 = 100_000_000
-    /// The longest a Space switch gets to start before we fall back to `activate`.
-    private nonisolated static let spaceSwitchWait: UInt64 = 300_000_000
+    /// The longest a Space switch gets to finish before we fall back to `activate`. SkyLight
+    /// reports the new Space only when the slide ends, 370–410 ms after the raise (measured on
+    /// macOS 27, 2026-10-04), so this has to outlast the slide.
+    private nonisolated static let spaceSwitchWait: UInt64 = 1_000_000_000
+    /// How long after the raise a stuck switch is still watched, only to log when the window came
+    /// on screen.
+    private nonisolated static let spaceWatchWait: UInt64 = 2_000_000_000
     private nonisolated static let queue = DispatchQueue(label: "com.luksanss.BetterTab.focus",
                                                          qos: .userInteractive)
+    /// Watching for the log happens here, so it never holds up the next pick.
+    private nonisolated static let watchQueue = DispatchQueue(label: "com.luksanss.BetterTab.focus.watch",
+                                                              qos: .utility)
     private nonisolated static let logger = Logger(subsystem: "com.luksanss.BetterTab", category: "focus")
 
     /// AX elements are safe to use from any thread.
@@ -105,7 +113,7 @@ enum Focuser {
         switch placement {
         case nil: outcome = .unknown
         case let placement? where !placement.isElsewhere: outcome = .here
-        default: outcome = waitUntilOnScreen(target.windowID) ? .switched : .stuck
+        default: outcome = waitUntilOnScreen(target.windowID, until: now() + spaceSwitchWait) != nil ? .switched : .stuck
         }
         let done = now()
 
@@ -125,8 +133,27 @@ enum Focuser {
             // `activate` switches to the Space of the app's front window, which the raise made
             // the target. It does nothing for an app that's already frontmost (measured on macOS
             // 27), which step 7 undid when it could.
+            let fellBack = now()
             activate(target, reason: "Space didn't switch", raiseError: raiseError)
+            watchQueue.async { logWhenOnScreen(target.windowID, raised: raised, fellBack: fellBack) }
         }
+    }
+
+    /// After a stuck switch: says when the window's Space did come on screen, if it did, measured
+    /// from the raise, so the log tells a slow slide from a switch that only `activate` made.
+    private nonisolated static func logWhenOnScreen(_ windowID: CGWindowID, raised: UInt64, fellBack: UInt64) {
+        guard let onScreen = waitUntilOnScreen(windowID, until: raised + spaceWatchWait) else {
+            logger.notice("""
+                window \(windowID, privacy: .private): not on screen \(spaceWatchWait / 1_000_000) ms \
+                after the raise (fallback at \(ms(raised, fellBack), format: .fixed(precision: 1)) ms)
+                """)
+            return
+        }
+        logger.notice("""
+            window \(windowID, privacy: .private): on screen \
+            \(ms(raised, onScreen), format: .fixed(precision: 1)) ms after the raise (fallback at \
+            \(ms(raised, fellBack), format: .fixed(precision: 1)) ms)
+            """)
     }
 
     // MARK: - Steps
@@ -191,17 +218,17 @@ enum Focuser {
                          originIsActive: active == nil || active == display.currentSpace)
     }
 
-    /// Waits until some display shows a Space the window is on. Both are re-read each time: an
-    /// app can move its window while it comes forward.
-    private nonisolated static func waitUntilOnScreen(_ windowID: CGWindowID) -> Bool {
-        let deadline = now() + spaceSwitchWait
+    /// Waits until some display shows a Space the window is on, and returns when it saw that, or
+    /// nil at the deadline. Both are re-read each time: an app can move its window while it comes
+    /// forward.
+    private nonisolated static func waitUntilOnScreen(_ windowID: CGWindowID, until deadline: UInt64) -> UInt64? {
         while true {
             let spaces = FocusSymbols.spaces(of: windowID)
             if let displays = FocusSymbols.displays(),
                displays.contains(where: { spaces.contains($0.currentSpace) }) {
-                return true
+                return now()
             }
-            if now() >= deadline { return false }
+            if now() >= deadline { return nil }
             usleep(10_000)
         }
     }
