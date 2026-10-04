@@ -10,8 +10,8 @@ apps. And the native ⌘⇥ switcher shows which apps have more than one window.
 
 ## Install
 
-1. Download the zip from [the latest release](https://github.com/Luksanss/betterTab/releases/latest),
-   unzip it, and move `BetterTab.app` to Applications.
+1. Download the `.dmg` from [the latest release](https://github.com/Luksanss/betterTab/releases/latest),
+   open it, and drag BetterTab onto Applications.
 2. Open it. The first time, macOS blocks it because it isn't notarized: go to System Settings →
    Privacy & Security and click Open Anyway.
 3. When macOS asks, switch BetterTab on under Accessibility. It's the only permission it needs.
