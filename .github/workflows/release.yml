@@ -21,13 +21,16 @@ jobs:
   release:
     # Releases only come from main, even when the workflow is run by hand.
     if: github.ref == 'refs/heads/main'
+    # The signing secrets live in this environment, which only main can use (docs/releasing.md).
+    environment: release
     # GitHub's Xcode 27 image: macOS 27 on arm64. It's the only hosted image with Xcode 27.
     runs-on: xcode-27
     timeout-minutes: 30
     env:
       XCODE: /Applications/Xcode_27.0.app
     steps:
-      - uses: actions/checkout@v7
+      # Actions are pinned by commit, because the signing key is unlocked while later steps run.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the version counts every commit
 
@@ -92,7 +95,7 @@ jobs:
       # dmgbuild, which lays out the disk image, needs Python 3.10 or later.
       - name: Set up Python
         if: steps.version.outputs.exists != 'true'
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
 
