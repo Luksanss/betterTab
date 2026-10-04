@@ -4,7 +4,9 @@ A macOS menu-bar utility. ⌘§ (the key above Tab on ISO keyboards) is ⌘⇥ f
 windows, drawn by BetterTab itself, windows on other Spaces included. ⌘⇥ stays native: BetterTab
 only draws stack edges behind the icons of apps with more than one window. Until 2026-10-01,
 releasing ⌘⇥ on such an app opened a window list; that was removed (`docs/spec.md` § Out of
-scope). See `docs/handoff.md` for where testing stands.
+scope). It updates itself from GitHub through Sparkle, but only when the user chooses Check for
+Updates… in the menu (`docs/spec.md` § Updates). See `docs/handoff.md` for
+where testing stands.
 
 ## Start here
 
@@ -58,6 +60,13 @@ One developer, one user, so keep it simple.
   ⌘ release from macOS; it was removed on 2026-10-01, so don't bring it back unasked.
 - **Never turn off native ⌘⇥.** `CGSSetSymbolicHotKeyEnabled` lasts after the app exits
   (`docs/architecture.md` § Route A+, removed).
+- **Offline unless asked.** The only network code is Check for Updates…, started from the menu.
+  No automatic checks, analytics, crash reports or telemetry, and nothing about the user or their
+  Mac goes out with the request (`docs/spec.md` § Privacy).
+- **Keep Sparkle's guards on.** The app holds Accessibility, so an update is unpacked only after
+  its EdDSA signature checks out (`SUVerifyUpdateBeforeExtraction` in `BetterTab/Info.plist`), and
+  the release workflow never publishes without the certificate and Sparkle's key
+  (`docs/architecture.md` § Updates). Don't turn either off.
 - **Don't copy code from AltTab or DockDoor.** Both are GPL-3.0; read them to learn the approach.
   WindowLens is MIT, so it can be reused as long as its copyright notice is kept.
 - **Agents never push or open pull requests.** The maintainer does.

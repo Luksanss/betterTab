@@ -8,6 +8,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let grantItem = NSMenuItem(title: "Grant Accessibility…", action: nil, keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: nil, keyEquivalent: "")
 
+    #if !DEBUG
+    /// Debug builds have no Check for Updates…, so a dev build never replaces itself with a release.
+    private let updater = Updater()
+    #endif
+
     #if DEBUG
     /// Debug › Status forces what the item shows. nil follows the real state.
     private var forcedState: AppStatus.State?
@@ -62,6 +67,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         launchAtLoginItem.target = self
         launchAtLoginItem.action = #selector(toggleLaunchAtLogin)
         menu.addItem(launchAtLoginItem)
+        #if !DEBUG
+        let updatesItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updatesItem.target = self
+        menu.addItem(updatesItem)
+        #endif
         menu.addItem(.separator())
 
         #if DEBUG
@@ -108,6 +118,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         LaunchAtLogin.toggle()
         launchAtLoginItem.state = LaunchAtLogin.isEnabled ? .on : .off
     }
+
+    #if !DEBUG
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+    #endif
 
     #if DEBUG
     private func makeDebugItem() -> NSMenuItem {

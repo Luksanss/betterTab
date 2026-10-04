@@ -21,13 +21,16 @@ jobs:
   release:
     # Releases only come from main, even when the workflow is run by hand.
     if: github.ref == 'refs/heads/main'
+    # The signing secrets live in this environment, which only main can use (docs/releasing.md).
+    environment: release
     # GitHub's Xcode 27 image: macOS 27 on arm64. It's the only hosted image with Xcode 27.
     runs-on: xcode-27
     timeout-minutes: 30
     env:
       XCODE: /Applications/Xcode_27.0.app
     steps:
-      - uses: actions/checkout@v7
+      # Actions are pinned by commit, because the signing key is unlocked while later steps run.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the version counts every commit
 
@@ -68,10 +71,10 @@ jobs:
           P12: ${{ secrets.SIGNING_CERT_P12 }}
           P12_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
         run: |
+          # An ad hoc release would lose every user's Accessibility grant, so there's no fallback.
           if [[ -z $P12 ]]; then
-            echo "Signed ad-hoc, because the SIGNING_CERT_P12 secret isn't set." \
-              "Users lose the Accessibility grant with every update." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error::The SIGNING_CERT_P12 secret isn't set in the release environment (docs/releasing.md)."
+            exit 1
           fi
           keychain=$RUNNER_TEMP/signing.keychain-db
           password=$(uuidgen)
@@ -92,7 +95,7 @@ jobs:
       # dmgbuild, which lays out the disk image, needs Python 3.10 or later.
       - name: Set up Python
         if: steps.version.outputs.exists != 'true'
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
 
@@ -103,6 +106,22 @@ jobs:
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
         run: scripts/build-release.sh
 
+      # Check for Updates… reads the appcast; Sparkle installs only a disk image signed with this key.
+      - name: Sign the update and write the appcast
+        if: steps.version.outputs.exists != 'true'
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+        run: |
+          if [[ -z $SPARKLE_KEY ]]; then
+            echo "::error::The SPARKLE_ED_PRIVATE_KEY secret isn't set in the release environment (docs/releasing.md)."
+            exit 1
+          fi
+          # printf is a builtin and a pipe isn't a file, so the key stays off disk and out of ps.
+          printf '%s' "$SPARKLE_KEY" | scripts/make-appcast.sh
+
+      # gh uploads both files before the release goes live, so the latest release always has its appcast.
       - name: Publish the release
         if: steps.version.outputs.exists != 'true'
         env:
@@ -110,7 +129,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           dmg=build/release/BetterTab-$VERSION.dmg
-          gh release create "v$VERSION" "$dmg" --title "BetterTab $VERSION" --generate-notes --target "$GITHUB_SHA"
+          gh release create "v$VERSION" "$dmg" build/release/appcast.xml --title "BetterTab $VERSION" \
+            --notes-file build/release/notes.md --target "$GITHUB_SHA"
           {
             echo "- Released [v$VERSION]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION)."
             echo "- SHA-256 of the disk image: \`$(shasum -a 256 "$dmg" | cut -d ' ' -f 1)\`"

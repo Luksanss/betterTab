@@ -7,6 +7,8 @@ file wins. Written 2026-09-29; the stack edges come from the Claude design v5
 edges replaced the window-count dots, the first launch shows the Accessibility prompt, the menu
 shows the version, every push to `main` publishes a release, and ⌘§ was added. Changed
 2026-10-01: ⌘⇥ is native again. The window list it opened on release is gone (§ Out of scope).
+Changed 2026-10-04: releases are disk images, and updating came into scope: Check for Updates…
+in the menu, the only time BetterTab goes online (§ Updates), built on Sparkle.
 
 ## In one sentence
 
@@ -27,6 +29,8 @@ These decide every case this spec doesn't cover.
    stronger than "another app has it".
 4. **Keyboard first.** Everything can be done from the keyboard. The mouse is a convenience,
    never a requirement.
+5. **Offline unless asked.** BetterTab goes online only when the user chooses Check for Updates….
+   It has no automatic checks, analytics or crash reports.
 
 ## ⌘⇥: stack edges
 
@@ -134,18 +138,19 @@ When idle, BetterTab uses no CPU. It has no timers and does no polling, only the
 
 ## The menu-bar item
 
-This is the only UI besides the stack edges and the ⌘§ switcher. It shows the app
-icon's keycap labelled A as a template icon, and the menu has:
+This is the only UI besides the stack edges, the ⌘§ switcher and the update dialogs. It shows the
+app icon's keycap labelled A as a template icon, and the menu has:
 
 - **A status line:** "Active", "Needs Accessibility permission", or "Can't find the ⌘⇥
   switcher". The last one appears when BetterTab has failed to find it three times in a row.
 - **Grant Accessibility…**, shown only when the permission is missing. It triggers the system
   prompt and opens System Settings at Privacy & Security → Accessibility.
 - **Launch at Login**, a checkmark toggle using `SMAppService`.
+- **Check for Updates…** (§ Updates). Debug builds don't have it.
 - **The version,** greyed out, such as "Version 0.1.87". Debug builds add "(Debug)".
 - **Quit BetterTab.**
 
-There's no Dock icon and no windows. Quit is the off switch.
+There's no Dock icon, and no windows apart from the update dialogs. Quit is the off switch.
 
 ## Permissions and first launch
 
@@ -159,12 +164,45 @@ There's no Dock icon and no windows. Quit is the off switch.
   it's revoked,** BetterTab goes back to the needs-permission state. ⌘⇥ keeps working natively
   throughout.
 
+## Updates
+
+Added 2026-10-04. Installing each release by hand meant deleting the old copy, dragging in the new
+one and granting Accessibility again. That last step comes from how a release is signed, not from
+how it's installed (`docs/releasing.md` § Signing with your certificate).
+
+- **Check for Updates…** in the menu asks GitHub for the latest release. It's the only way an
+  update starts: BetterTab never checks by itself (§ Privacy). The windows are
+  [Sparkle](https://sparkle-project.org)'s, in English.
+- **Already up to date:** "You're up to date!", with the version that's installed.
+- **A newer version:** a window shows its version and release notes, the features and fixes
+  since the last release, with Install Update, Remind Me Later and Skip This Version. Install
+  Update downloads it and checks its signature (`docs/architecture.md` § Updates), then Install
+  and Relaunch replaces the app where it's installed and relaunches it. Remind Me Later changes
+  nothing. Skip This Version only affects automatic checks, which BetterTab doesn't make, so the
+  next Check for Updates… shows that version again.
+- **The new copy keeps** the Accessibility grant and Launch at Login, and needs no Open Anyway.
+  Keeping the grant needs every release signed with the same certificate; an ad hoc release loses
+  it, however it's installed.
+- **If anything goes wrong** (offline, GitHub unreachable, a download that fails its check), a
+  dialog says what happened, and the installed copy keeps running unchanged. A download that fails
+  its check is never unpacked.
+- **While it installs,** BetterTab quits and its key tap goes with it, so ⌘⇥ and ⌘ work as usual
+  throughout (principle 2).
+- **Debug builds don't have the item,** so a dev build never replaces itself with a release.
+
 ## Privacy
 
-BetterTab has no network code, analytics or crash reporting, and saves nothing to disk apart from
-the Launch at Login state and whether the first-launch prompt has been shown. Window titles and
-frames are held in memory only while a switcher is open, and are never logged. Release builds log counts
-and states only.
+BetterTab goes online only when the user chooses Check for Updates…: it asks GitHub for the latest
+release and, if the user clicks Install Update, downloads it. Nothing about the user or their Mac
+is sent. GitHub sees what any download shows it: the IP address, and the user agent
+`BetterTab/<version> Sparkle/<version>`. Sparkle's system profile is off. There's no analytics or
+crash reporting.
+
+BetterTab saves nothing to disk apart from the Launch at Login state, whether the first-launch
+prompt has been shown, and a downloaded update until it's installed. Once Check for Updates… has
+been used, Sparkle adds its own settings: `SUHasLaunchedBefore`, `SULastCheckTime`, and a skipped
+version if there is one. Window titles and frames are held in memory only while a switcher is
+open, and are never logged. Release builds log counts and states only.
 
 ## Performance targets
 
@@ -204,8 +242,10 @@ These aren't "later"; they're **no**, unless daily use proves otherwise:
 - shortcuts or modes beyond ⌘§;
 - a settings window, and per-app exclusion lists;
 - Dock previews;
-- notarization and automatic updates. Releases are zips on GitHub (`docs/releasing.md`); users
-  click Open Anyway once, and download new versions themselves.
+- automatic update checks, silent installs, analytics and crash reports: BetterTab goes online only
+  when asked (§ Privacy);
+- notarization. Releases are disk images on GitHub (`docs/releasing.md`), and users click Open
+  Anyway once, when they first install.
 
 ## Acceptance tests
 
@@ -245,3 +285,11 @@ Run these by hand on macOS 27. "Chrome ×3" means three Chrome windows on the cu
     system prompt appears once, and not on later launches.
 18. **Idle.** With no switcher open for a minute, Activity Monitor shows 0% CPU.
 19. **Version.** The menu shows "Version" and the release's version, such as 1.0.70.
+20. **Update.** With an older certificate-signed release installed, Accessibility granted and
+    Launch at Login on, choose Check for Updates…: the newer version and its notes show. Install
+    Update, then Install and Relaunch: BetterTab relaunches as the new version, the menu shows that
+    version and "Active" with no permission prompt and no Open Anyway, and Launch at Login is still
+    on. With the latest installed, it says "You're up to date!". With Wi-Fi off, it says it
+    couldn't check, and nothing changes.
+21. **Offline unless asked.** Over a day of use without choosing Check for Updates…, a network
+    monitor shows no connections from BetterTab.

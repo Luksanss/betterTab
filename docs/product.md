@@ -3,7 +3,8 @@
 Working name, taken from the repo. A macOS menu-bar utility that gets you to the right window:
 ⌘§ switches between the front app's windows the way ⌘⇥ switches between apps, and the native ⌘⇥
 switcher shows which apps have more than one window. Written 2026-09-29, before the build, and
-revised on 2026-10-01, when the window list on ⌘⇥ was dropped.
+revised on 2026-10-01, when the window list on ⌘⇥ was dropped, and on 2026-10-04, when updating
+came into scope.
 
 ## The problem
 
@@ -34,7 +35,8 @@ the native ⌘⇥, which was the core of the first idea. The maintainer has rule
 bloated. **Being minimal is BetterTab's whole reason to exist:**
 - a single-purpose app, with nothing else attached;
 - window outlines and titles instead of thumbnails, so Accessibility is the only permission;
-- one home-row letter per window, instead of hunting for it.
+- one home-row letter per window, instead of hunting for it;
+- offline unless you ask it to check for updates.
 
 Any feature beyond `docs/spec.md` needs a reason. "DockDoor has it" is not a reason.
 
@@ -69,6 +71,15 @@ and when it lands on the wrong window, ⌘§ fixes it in a tap; the maintainer s
 well" for exactly that. So the list went, and ⌘⇥ is native. The stack edges stayed: they still
 show which apps have more than one window, which is when ⌘§ has somewhere to go. Exact behaviour
 is in `docs/spec.md`.
+
+## Updates (added 2026-10-04)
+
+Installing each release by hand meant deleting the old copy, dragging in the new one and granting
+Accessibility again. The maintainer: "we value privacy, but updater is needed." So BetterTab
+updates itself, but only when asked: Check for Updates… in the menu, which shows the new version
+and installs it on a click. It never checks by itself, so it goes online only when you ask it to.
+The repeated permission prompt is a separate problem with a separate fix: macOS keeps the grant
+only when every release is signed with the same certificate (`docs/releasing.md`).
 
 ## Scope
 
