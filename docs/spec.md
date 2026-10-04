@@ -143,8 +143,9 @@ app icon's keycap labelled A as a template icon, and the menu has:
 
 - **A status line:** "Active", "Needs Accessibility permission", or "Can't find the ⌘⇥
   switcher". The last one appears when BetterTab has failed to find it three times in a row.
-- **Grant Accessibility…**, shown only when the permission is missing. It triggers the system
-  prompt and opens System Settings at Privacy & Security → Accessibility.
+- **Grant Accessibility…**, shown only when the permission is missing. It opens System Settings
+  at Privacy & Security → Accessibility, without the system prompt (changed 2026-10-04: the
+  prompt was a second dialog in front of the same switch).
 - **Launch at Login**, a checkmark toggle using `SMAppService`.
 - **Check for Updates…** (§ Updates). Debug builds don't have it.
 - **The version,** greyed out, such as "Version 0.1.87". Debug builds add "(Debug)".
