@@ -8,7 +8,7 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/Luksanss/betterTab/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>SPARKLE_PUBLIC_KEY_PENDING</string>
+	<string>gt7d0PX9lYGsog55yR38/cUh1ASMijDAlte1e6bo5R0=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<false/>
 	<key>SUAutomaticallyUpdate</key>
